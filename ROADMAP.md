@@ -29,6 +29,7 @@ Current State (2026-02-03):
 - Enforce safe defaults in app integration: `XML_PARSE_NO_XXE | XML_PARSE_NONET`, avoid `XML_PARSE_NOENT` for untrusted content.
 - App-side: add `XML_PARSE_NO_XXE` to libmobi `xmlReadMemory` calls in `src/parse_rawml.c` (NCX parsing).
 - App-side: confirm HTML parsing paths use `HTML_PARSE_NONET` (already set) and avoid any entity expansion.
+- Add DRM-friendly controls: `XML_PARSE_REQUIRE_LOADER` and resource policy hooks.
 - Add a build-time switch to hard-enforce safe defaults in libxml2 for legacy APIs (opt-in; does not change default behavior unless enabled).
 - Set a strict amplification factor via `xmlCtxtSetMaxAmplification` for untrusted input.
 - Add/enable limits for dictionary size and node sizes when reading untrusted documents.

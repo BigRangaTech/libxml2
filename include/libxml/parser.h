@@ -252,6 +252,25 @@ typedef xmlParserErrors
                      xmlParserInput **out);
 
 /**
+ * Callback for resource policy decisions.
+ *
+ * Return XML_ERR_OK to allow loading. Any other xmlParserErrors code
+ * denies loading and will be reported via the error handler.
+ *
+ * `flags` can contain XML_INPUT_UNZIP and XML_INPUT_NETWORK.
+ *
+ * @param ctxt  user data
+ * @param url  URL or system ID to load
+ * @param publicId  public ID from DTD (optional)
+ * @param type  resource type
+ * @param flags  flags
+ * @returns an xmlParserErrors code.
+ */
+typedef xmlParserErrors
+(*xmlResourcePolicy)(void *ctxt, const char *url, const char *publicId,
+                     xmlResourceType type, xmlParserInputFlags flags);
+
+/**
  * Parser context
  */
 struct _xmlParserCtxt {
@@ -638,6 +657,9 @@ struct _xmlParserCtxt {
 
     xmlResourceLoader resourceLoader XML_DEPRECATED_MEMBER;
     void *resourceCtxt XML_DEPRECATED_MEMBER;
+
+    xmlResourcePolicy resourcePolicy XML_DEPRECATED_MEMBER;
+    void *resourcePolicyCtxt XML_DEPRECATED_MEMBER;
 
     xmlCharEncConvImpl convImpl XML_DEPRECATED_MEMBER;
     void *convCtxt XML_DEPRECATED_MEMBER;
@@ -1884,7 +1906,16 @@ typedef enum {
      *
      * @since 2.15.0
      */
-    XML_PARSE_SKIP_IDS = 1<<27
+    XML_PARSE_SKIP_IDS = 1<<27,
+    /**
+     * Require a custom resource loader for external resources.
+     *
+     * If set, loading will fail unless a resource loader was
+     * installed with #xmlCtxtSetResourceLoader.
+     *
+     * @since 2.16.0
+     */
+    XML_PARSE_REQUIRE_LOADER = 1<<28
 } xmlParserOption;
 
 XMLPUBFUN void
@@ -1973,6 +2004,15 @@ XMLPUBFUN void
 		xmlCtxtSetResourceLoader(xmlParserCtxt *ctxt,
 					 xmlResourceLoader loader,
 					 void *vctxt);
+XMLPUBFUN void
+		xmlCtxtSetResourcePolicy(xmlParserCtxt *ctxt,
+					 xmlResourcePolicy policy,
+					 void *vctxt);
+XMLPUBFUN xmlResourcePolicy
+		xmlSetResourcePolicy(xmlResourcePolicy policy,
+				     void *vctxt);
+XMLPUBFUN xmlResourcePolicy
+		xmlGetResourcePolicy(void **vctxt);
 XMLPUBFUN void
 		xmlCtxtSetCharEncConvImpl(xmlParserCtxt *ctxt,
 					 xmlCharEncConvImpl impl,

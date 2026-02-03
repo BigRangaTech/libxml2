@@ -182,6 +182,9 @@ main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED) {
     xmlCtxtSetOptions(NULL, 0);
     xmlCtxtSetPrivate(NULL, NULL);
     xmlCtxtSetResourceLoader(NULL, 0, NULL);
+    xmlCtxtSetResourcePolicy(NULL, 0, NULL);
+    xmlSetResourcePolicy(NULL, NULL);
+    xmlGetResourcePolicy(NULL);
     xmlCtxtSetSaxHandler(NULL, NULL);
     xmlCtxtUseOptions(NULL, 0);
     xmlCurrentChar(NULL, NULL);

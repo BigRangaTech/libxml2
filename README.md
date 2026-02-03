@@ -53,6 +53,26 @@ welcome, so if something is important for you, you can always get
 involved, implement it yourself and be part of the open source
 community.
 
+## DRM-Friendly Parsing (Optional)
+
+If you need to enforce DRM-style controls over external resource loading,
+use the resource loader and policy APIs:
+
+```c
+xmlParserCtxt *ctxt = xmlNewParserCtxt();
+xmlCtxtSetResourceLoader(ctxt, my_loader, my_ctx);
+xmlCtxtSetResourcePolicy(ctxt, my_policy, my_ctx);
+
+/* Require a custom loader for any external resource. */
+xmlCtxtSetOptions(ctxt, XML_PARSE_REQUIRE_LOADER |
+                         XML_PARSE_NO_XXE |
+                         XML_PARSE_NONET);
+```
+
+`XML_PARSE_REQUIRE_LOADER` will fail external loads unless a custom
+resource loader is installed. The policy callback can approve or deny
+loads before the loader is invoked.
+
 ## Build instructions
 
 libxml2 can be built with GNU Autotools, CMake or meson.

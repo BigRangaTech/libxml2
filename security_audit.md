@@ -21,6 +21,9 @@ This is a living document; update it whenever security-relevant behavior changes
 - Use `XML_PARSE_NO_XXE` and `XML_PARSE_NONET` for untrusted input.
 - Set a max amplification factor via `xmlSetMaxAmplificationDefault`.
 - Enforce dictionary limits via `xmlDictSetDefaultLimit`.
+- Use `XML_PARSE_REQUIRE_LOADER` with `xmlCtxtSetResourceLoader` to enforce
+  DRM-style resource control.
+- Use `xmlCtxtSetResourcePolicy` to approve/deny external resource loads.
 - Avoid DTD validation and external resource loading for untrusted data.
 
 ## Open Questions
@@ -30,3 +33,4 @@ This is a living document; update it whenever security-relevant behavior changes
 ## Change Log
 - 2026-02-03: Added global defaults for max amplification and dict limits.
 - 2026-02-03: Added xmllint `--no-xxe` option and RNG `/dev/urandom` fallback.
+- 2026-02-03: Added resource loader requirement and resource policy hooks.

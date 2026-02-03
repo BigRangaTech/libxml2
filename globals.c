@@ -226,6 +226,8 @@ static int xmlSubstituteEntitiesDefaultValueThrDef = 0;
 static unsigned xmlMaxAmplificationDefaultThrDef =
         XML_MAX_AMPLIFICATION_DEFAULT;
 static size_t xmlDictDefaultLimitThrDef = 0;
+static xmlResourcePolicy xmlResourcePolicyThrDef = NULL;
+static void *xmlResourcePolicyCtxtThrDef = NULL;
 
 static xmlRegisterNodeFunc xmlRegisterNodeDefaultValueThrDef = NULL;
 static xmlDeregisterNodeFunc xmlDeregisterNodeDefaultValueThrDef = NULL;
@@ -1083,6 +1085,49 @@ xmlDictGetDefaultLimit(void)
     xmlInitParser();
     xmlMutexLock(&xmlThrDefMutex);
     ret = xmlDictDefaultLimitThrDef;
+    xmlMutexUnlock(&xmlThrDefMutex);
+
+    return ret;
+}
+
+/**
+ * Set the default resource policy callback for new parser contexts.
+ *
+ * @param policy  new policy callback (or NULL to clear)
+ * @param vctxt  user data for the policy
+ * @returns the old policy callback
+ */
+xmlResourcePolicy
+xmlSetResourcePolicy(xmlResourcePolicy policy, void *vctxt)
+{
+    xmlResourcePolicy ret;
+
+    xmlInitParser();
+    xmlMutexLock(&xmlThrDefMutex);
+    ret = xmlResourcePolicyThrDef;
+    xmlResourcePolicyThrDef = policy;
+    xmlResourcePolicyCtxtThrDef = vctxt;
+    xmlMutexUnlock(&xmlThrDefMutex);
+
+    return ret;
+}
+
+/**
+ * Get the default resource policy callback for new parser contexts.
+ *
+ * @param vctxt  output pointer for user data (optional)
+ * @returns the current policy callback
+ */
+xmlResourcePolicy
+xmlGetResourcePolicy(void **vctxt)
+{
+    xmlResourcePolicy ret;
+
+    xmlInitParser();
+    xmlMutexLock(&xmlThrDefMutex);
+    ret = xmlResourcePolicyThrDef;
+    if (vctxt != NULL)
+        *vctxt = xmlResourcePolicyCtxtThrDef;
     xmlMutexUnlock(&xmlThrDefMutex);
 
     return ret;

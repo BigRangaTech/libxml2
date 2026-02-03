@@ -13166,7 +13166,8 @@ xmlCtxtSetOptionsInternal(xmlParserCtxtPtr ctxt, int options, int keepMask)
               XML_PARSE_NO_XXE |
               XML_PARSE_UNZIP |
               XML_PARSE_NO_SYS_CATALOG |
-              XML_PARSE_CATALOG_PI;
+              XML_PARSE_CATALOG_PI |
+              XML_PARSE_REQUIRE_LOADER;
 
     ctxt->options = (ctxt->options & keepMask) | (options & allMask);
 
@@ -13253,6 +13254,7 @@ xmlCtxtGetOptions(xmlParserCtxt *ctxt)
  * - XML_PARSE_OLDSAX
  * - XML_PARSE_IGNORE_ENC
  * - XML_PARSE_BIG_LINES
+ * - XML_PARSE_REQUIRE_LOADER
  *
  * @deprecated Use #xmlCtxtSetOptions.
  *
@@ -13284,7 +13286,8 @@ xmlCtxtUseOptions(xmlParserCtxt *ctxt, int options)
                XML_PARSE_HUGE |
                XML_PARSE_OLDSAX |
                XML_PARSE_IGNORE_ENC |
-               XML_PARSE_BIG_LINES;
+               XML_PARSE_BIG_LINES |
+               XML_PARSE_REQUIRE_LOADER;
 
     return(xmlCtxtSetOptionsInternal(ctxt, options, keepMask));
 }
@@ -13714,4 +13717,3 @@ xmlCtxtReadIO(xmlParserCtxt *ctxt, xmlInputReadCallback ioread,
 
     return(xmlCtxtParseDocument(ctxt, input));
 }
-

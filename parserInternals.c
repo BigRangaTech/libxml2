@@ -2645,6 +2645,27 @@ xmlCtxtSetResourceLoader(xmlParserCtxt *ctxt, xmlResourceLoader loader,
 }
 
 /**
+ * Installs a resource policy callback to approve or deny loading
+ * of external resources.
+ *
+ * If `vctxt` is NULL, the parser context will be passed.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @param policy  callback
+ * @param vctxt  user data (optional)
+ */
+void
+xmlCtxtSetResourcePolicy(xmlParserCtxt *ctxt, xmlResourcePolicy policy,
+                         void *vctxt) {
+    if (ctxt == NULL)
+        return;
+
+    ctxt->resourcePolicy = policy;
+    ctxt->resourcePolicyCtxt = vctxt;
+}
+
+/**
  * @param ctxt  parser context
  * @param url  the URL or system ID for the entity to load
  * @param publicId  the public ID for the entity to load (optional)
@@ -2656,14 +2677,32 @@ xmlLoadResource(xmlParserCtxt *ctxt, const char *url, const char *publicId,
                 xmlResourceType type) {
     char *canonicFilename;
     xmlParserInputPtr ret;
+    xmlParserInputFlags flags = 0;
+    xmlResourcePolicy policy = NULL;
+    void *policyCtxt = NULL;
 
     if (url == NULL)
         return(NULL);
 
+    if (ctxt != NULL) {
+        if (ctxt->options & XML_PARSE_UNZIP)
+            flags |= XML_INPUT_UNZIP;
+        if ((ctxt->options & XML_PARSE_NONET) == 0)
+            flags |= XML_INPUT_NETWORK;
+
+        policy = ctxt->resourcePolicy;
+        policyCtxt = ctxt->resourcePolicyCtxt;
+
+        if ((ctxt->options & XML_PARSE_REQUIRE_LOADER) &&
+            (ctxt->resourceLoader == NULL)) {
+            xmlCtxtErrIO(ctxt, XML_IO_EACCES, url);
+            return(NULL);
+        }
+    }
+
     if ((ctxt != NULL) && (ctxt->resourceLoader != NULL)) {
         char *resource = NULL;
         void *userData;
-        xmlParserInputFlags flags = 0;
         int code;
 
 #ifdef LIBXML_CATALOG_ENABLED
@@ -2672,10 +2711,17 @@ xmlLoadResource(xmlParserCtxt *ctxt, const char *url, const char *publicId,
             url = resource;
 #endif
 
-        if (ctxt->options & XML_PARSE_UNZIP)
-            flags |= XML_INPUT_UNZIP;
-        if ((ctxt->options & XML_PARSE_NONET) == 0)
-            flags |= XML_INPUT_NETWORK;
+        if (policy != NULL) {
+            void *userDataPolicy = policyCtxt ? policyCtxt : ctxt;
+
+            code = policy(userDataPolicy, url, publicId, type, flags);
+            if (code != XML_ERR_OK) {
+                xmlCtxtErrIO(ctxt, code, url);
+                if (resource != NULL)
+                    xmlFree(resource);
+                return(NULL);
+            }
+        }
 
         userData = ctxt->resourceCtxt;
         if (userData == NULL)
@@ -2690,6 +2736,15 @@ xmlLoadResource(xmlParserCtxt *ctxt, const char *url, const char *publicId,
         if (resource != NULL)
             xmlFree(resource);
         return(ret);
+    }
+
+    if ((ctxt != NULL) && (policy != NULL)) {
+        void *userDataPolicy = policyCtxt ? policyCtxt : ctxt;
+        int code = policy(userDataPolicy, url, publicId, type, flags);
+        if (code != XML_ERR_OK) {
+            xmlCtxtErrIO(ctxt, code, url);
+            return(NULL);
+        }
     }
 
     canonicFilename = (char *) xmlCanonicPath((const xmlChar *) url);
@@ -2902,6 +2957,7 @@ xmlInitSAXParserCtxt(xmlParserCtxtPtr ctxt, const xmlSAXHandler *sax,
     ctxt->sizeentcopy = 0;
     ctxt->input_id = 1;
     ctxt->maxAmpl = xmlGetMaxAmplificationDefault();
+    ctxt->resourcePolicy = xmlGetResourcePolicy(&ctxt->resourcePolicyCtxt);
     xmlInitNodeInfoSeq(&ctxt->node_seq);
 
     if (ctxt->nsdb == NULL) {

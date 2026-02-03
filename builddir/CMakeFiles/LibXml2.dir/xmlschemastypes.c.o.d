@@ -1,7 +1,7 @@
 CMakeFiles/LibXml2.dir/xmlschemastypes.c.o: \
  /home/jessie/Documents/libxml2/xmlschemastypes.c \
  /usr/include/stdc-predef.h /home/jessie/Documents/libxml2/libxml.h \
- /home/jessie/Documents/libxml2/builddir/config.h \
+ /home/jessie/Documents/libxml2/config.h \
  /home/jessie/Documents/libxml2/builddir/libxml/xmlversion.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlexports.h \
  /usr/lib/gcc/x86_64-linux-gnu/15/include/stdint.h /usr/include/stdint.h \

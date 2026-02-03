@@ -202,6 +202,74 @@ testInvalidCharRecovery(void) {
     return err;
 }
 
+static xmlParserErrors
+denyResourcePolicy(void *vctxt, const char *url ATTRIBUTE_UNUSED,
+                   const char *publicId ATTRIBUTE_UNUSED,
+                   xmlResourceType type ATTRIBUTE_UNUSED,
+                   xmlParserInputFlags flags ATTRIBUTE_UNUSED)
+{
+    int *called = vctxt;
+
+    if (called != NULL)
+        (*called)++;
+    return XML_IO_EACCES;
+}
+
+static int
+testRequireResourceLoader(void) {
+    const char *xml = "<!DOCTYPE doc SYSTEM \"file:///nope.dtd\"><doc/>";
+    xmlDocPtr doc;
+    const xmlError *error;
+    int err = 0;
+
+    xmlResetLastError();
+    doc = xmlReadMemory(xml, (int) strlen(xml), NULL, NULL,
+                        XML_PARSE_DTDLOAD | XML_PARSE_REQUIRE_LOADER);
+    if (doc != NULL)
+        xmlFreeDoc(doc);
+
+    error = xmlGetLastError();
+    if (error == NULL || error->code != XML_IO_EACCES) {
+        fprintf(stderr, "testRequireResourceLoader failed\n");
+        err = 1;
+    }
+
+    return err;
+}
+
+static int
+testResourcePolicy(void) {
+    const char *xml = "<!DOCTYPE doc SYSTEM \"file:///nope.dtd\"><doc/>";
+    xmlParserCtxtPtr ctxt;
+    xmlDocPtr doc;
+    const xmlError *error;
+    int called = 0;
+    int err = 0;
+
+    ctxt = xmlNewParserCtxt();
+    xmlCtxtSetResourcePolicy(ctxt, denyResourcePolicy, &called);
+    xmlResetLastError();
+    doc = xmlCtxtReadMemory(ctxt, xml, (int) strlen(xml), NULL, NULL,
+                            XML_PARSE_DTDLOAD);
+    if (doc != NULL)
+        xmlFreeDoc(doc);
+
+    if (called == 0) {
+        fprintf(stderr, "testResourcePolicy failed to call policy\n");
+        err = 1;
+    }
+
+    error = xmlGetLastError();
+    if (error == NULL || error->code != XML_IO_EACCES) {
+        fprintf(stderr, "testResourcePolicy failed\n");
+        err = 1;
+    }
+
+    xmlFreeParserCtxt(ctxt);
+
+    return err;
+}
+
 static void
 testCtxtInputGetterError(void *errCtxt, const xmlError *error) {
     int *err = errCtxt;
@@ -1541,6 +1609,8 @@ main(void) {
     err |= testCFileIO();
     err |= testUndeclEntInContent();
     err |= testInvalidCharRecovery();
+    err |= testRequireResourceLoader();
+    err |= testResourcePolicy();
     err |= testCtxtInputGetters();
 #ifdef LIBXML_VALID_ENABLED
     err |= testSwitchDtd();
@@ -1594,4 +1664,3 @@ main(void) {
 
     return err;
 }
-

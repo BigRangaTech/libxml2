@@ -10,5 +10,8 @@ on what changed and why it matters.
 - Security/Hardening: Added global defaults for max amplification and dictionary
   size limits (`xmlSetMaxAmplificationDefault`, `xmlDictSetDefaultLimit`) and
   apply them to new parser contexts and dictionaries.
+- Security/DRM: Added `XML_PARSE_REQUIRE_LOADER` plus resource policy hooks
+  (`xmlCtxtSetResourcePolicy`, `xmlSetResourcePolicy`) to enforce external
+  resource control.
 - Process: Added `ROADMAP.md`, `security_audit.md`, and `testresults.md` to keep
   planning, security review, and test status up to date.
