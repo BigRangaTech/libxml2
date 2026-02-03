@@ -54,12 +54,6 @@
 #define XML_MAX_ERRORS 100
 
 /*
- * XML_MAX_AMPLIFICATION_DEFAULT is the default maximum allowed amplification
- * factor of serialized output after entity expansion.
- */
-#define XML_MAX_AMPLIFICATION_DEFAULT 5
-
-/*
  * Various global defaults for parsing
  */
 
@@ -2907,7 +2901,7 @@ xmlInitSAXParserCtxt(xmlParserCtxtPtr ctxt, const xmlSAXHandler *sax,
     ctxt->sizeentities = 0;
     ctxt->sizeentcopy = 0;
     ctxt->input_id = 1;
-    ctxt->maxAmpl = XML_MAX_AMPLIFICATION_DEFAULT;
+    ctxt->maxAmpl = xmlGetMaxAmplificationDefault();
     xmlInitNodeInfoSeq(&ctxt->node_seq);
 
     if (ctxt->nsdb == NULL) {
@@ -3745,4 +3739,3 @@ xmlKeepBlanksDefault(int val) {
 #endif
     return(old);
 }
-

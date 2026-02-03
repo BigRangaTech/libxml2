@@ -1,0 +1,1 @@
+/usr/bin/cc  -pedantic -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes -Wno-long-long -Wno-format-extra-args -Wno-array-bounds -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/runtest.dir/link.d CMakeFiles/runtest.dir/runtest.c.o -o runtest  -Wl,-rpath,/home/jessie/Documents/libxml2/builddir libxml2.so.16.2.0

@@ -10,6 +10,12 @@
 
 #define XML_MAX_URI_LENGTH 2000
 
+/*
+ * Default maximum allowed amplification factor of serialized output after
+ * entity expansion.
+ */
+#define XML_MAX_AMPLIFICATION_DEFAULT 5
+
 /**
  * Set after xmlValidateDtdFinal was called.
  */

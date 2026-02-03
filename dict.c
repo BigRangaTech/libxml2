@@ -259,7 +259,7 @@ xmlDictCreate(void) {
     if (dict == NULL)
         return(NULL);
     dict->ref_counter = 1;
-    dict->limit = 0;
+    dict->limit = xmlDictGetDefaultLimit();
 
     dict->size = 0;
     dict->nbElems = 0;
@@ -893,9 +893,10 @@ xmlDictQLookup(xmlDict *dict, const xmlChar *prefix, const xmlChar *name) {
   #include <windows.h>
   #include <bcrypt.h>
 #else
+  #include <fcntl.h>
+  #include <unistd.h>
   #if HAVE_DECL_GETENTROPY
     /* POSIX 2024 */
-    #include <unistd.h>
     /* Older platforms */
     #include <sys/random.h>
   #endif
@@ -961,7 +962,39 @@ xmlInitRandom(void) {
 #endif
 
         /*
-         * TODO: Fallback to /dev/urandom for older POSIX systems.
+         * Fallback to /dev/urandom for older POSIX systems.
+         */
+        {
+            int fd;
+            ssize_t nread = 0;
+            int flags = O_RDONLY;
+#ifdef O_CLOEXEC
+            flags |= O_CLOEXEC;
+#endif
+            fd = open("/dev/urandom", flags);
+            if (fd >= 0) {
+                unsigned char *out = (unsigned char *) globalRngState;
+                size_t remaining = sizeof(globalRngState);
+                while (remaining > 0) {
+                    ssize_t n = read(fd, out + nread, remaining);
+                    if (n > 0) {
+                        nread += n;
+                        remaining -= n;
+                        continue;
+                    }
+                    if ((n < 0) && (errno == EINTR))
+                        continue;
+                    break;
+                }
+                close(fd);
+                if (nread == (ssize_t) sizeof(globalRngState))
+                    return;
+            }
+        }
+
+        /*
+         * Weak fallback as a last resort. This should only be hit on
+         * very old or restricted systems without entropy sources.
          */
         globalRngState[0] =
                 (unsigned) time(NULL) ^
@@ -1023,4 +1056,3 @@ unsigned
 xmlRandom(void) {
     return(xoroshiro64ss(xmlGetLocalRngState()));
 }
-

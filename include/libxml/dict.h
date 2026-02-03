@@ -39,6 +39,22 @@ XMLPUBFUN int  xmlInitializeDict(void);
  */
 XMLPUBFUN xmlDict *
 			xmlDictCreate	(void);
+/**
+ * Set the default dictionary size limit for new dictionaries.
+ *
+ * A value of 0 disables the limit.
+ *
+ * @returns the old value
+ */
+XMLPUBFUN size_t
+			xmlDictSetDefaultLimit(size_t limit);
+/**
+ * Get the default dictionary size limit for new dictionaries.
+ *
+ * @returns the current value in bytes, or 0 if unlimited
+ */
+XMLPUBFUN size_t
+			xmlDictGetDefaultLimit(void);
 XMLPUBFUN size_t
 			xmlDictSetLimit	(xmlDict *dict,
                                          size_t limit);

@@ -1,0 +1,80 @@
+# libxml2 E-Reader Roadmap (Draft v0)
+
+Goal: prioritize security, then performance, then features, then API/switches, then build size, then compatibility for the e-reader stack (Linux + Android) where libxml2 is used via libmobi.
+
+Scope: libxml2 fork changes and app-side integration changes in the e-reader app and libmobi that affect security/perf. Avoid breaking libmobi unless explicitly accepted.
+
+Constraints:
+- Monocypher stays app-side (no new libxml2 dependency).
+- libxml2 is a dependency of libmobi and the app; prefer additive changes.
+- Keep all modules fully supported; focus on stability and security, not feature trimming.
+
+Current State (2026-02-03):
+- Fork matches upstream master at commit `2cc58340`.
+- Added `/dev/urandom` fallback for RNG seeding on older POSIX systems in `dict.c`.
+- Added xmllint `--no-xxe` switch and documentation in `xmllint.c` and `doc/xmllint.xml`.
+- libmobi uses libxml2 optionally via `USE_LIBXML2` (internal xmlwriter available if disabled).
+- libmobi parse entry point: `src/parse_rawml.c` uses `htmlReadMemory(... HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING | HTML_PARSE_NONET)`.
+- libmobi parse entry point: `src/parse_rawml.c` uses `xmlReadMemory(... XML_PARSE_RECOVER | XML_PARSE_NOERROR | XML_PARSE_NOWARNING | XML_PARSE_NONET)` for NCX.
+- libmobi output use: `src/opf.c` uses `xmlTextWriter*` APIs (writer only).
+
+## Phase 0: Baseline & Inventory
+- Confirm libmobi usage paths (which libxml2 APIs, options, and parsing modes it uses).
+- Inventory app-side parsing entry points (where the app calls libmobi/libxml2).
+- Capture current build matrix for Linux + Android (NDK versions, libc, CPU arch).
+- Document current parser options used in production (XML_PARSE_* and HTML_PARSE_*).
+- Establish a minimal regression test set (smoke parse, sample ebooks, malformed files).
+
+## Phase 1: Security Hardening (Highest Priority)
+- Enforce safe defaults in app integration: `XML_PARSE_NO_XXE | XML_PARSE_NONET`, avoid `XML_PARSE_NOENT` for untrusted content.
+- App-side: add `XML_PARSE_NO_XXE` to libmobi `xmlReadMemory` calls in `src/parse_rawml.c` (NCX parsing).
+- App-side: confirm HTML parsing paths use `HTML_PARSE_NONET` (already set) and avoid any entity expansion.
+- Add a build-time switch to hard-enforce safe defaults in libxml2 for legacy APIs (opt-in; does not change default behavior unless enabled).
+- Set a strict amplification factor via `xmlCtxtSetMaxAmplification` for untrusted input.
+- Add/enable limits for dictionary size and node sizes when reading untrusted documents.
+- Review recent CVEs to verify coverage in this fork and identify any downstream mitigations needed.
+- Add guidance on disabling DTD validation for untrusted content.
+
+## Phase 2: Performance & Memory
+- Prefer streaming APIs (`xmlReader`) where libmobi permits it.
+- Ensure `XML_PARSE_COMPACT` is enabled for memory reduction.
+- Evaluate memory caps per parse (max document size, max dictionary size).
+- Add profiling notes for typical e-reader content and large/edge-case documents.
+
+## Phase 3: Features (App-Side Monocypher)
+- App-side: use Monocypher to hash canonicalized XML content (C14N) for integrity checks.
+- App-side: choose hash algorithm (BLAKE3 for speed or SHA-256 for compatibility).
+- App-side: implement streaming hash adapter (init/update/final) for large documents.
+- App-side: optional signature verification for packaged content if needed (future).
+- Library-side: ensure canonicalization paths are stable and documented for app use.
+- C++ API: provide a thin C++ wrapper over Monocypher C functions (RAII for ctx).
+- Rust bindings: create a small `monocypher-sys` + safe wrapper crate (bindgen or handwritten).
+- Python bindings: expose a minimal hashing API via `cffi` or `pybind11`.
+
+## Phase 4: API/Switches
+- Expose a CLI or build‑time switch for `--no-xxe` in xmllint (already added in this fork).
+- Add a libxml2 config toggle to enable safe defaults globally when built for e-reader firmware.
+- Add a switch to set max amplification from environment or config.
+
+## Phase 5: Build Size & Compatibility
+- Keep all modules enabled; do not trim features for this fork.
+- Focus on compatibility across Linux + Android and stable behavior under stress.
+- Verify ABI compatibility with existing app builds.
+- Maintain Android NDK compatibility (avoid APIs missing on older API levels).
+
+## Decisions Needed (Tracked)
+- D1: Enforce safe defaults at library level or app level only. Owner: TBD. Target: TBD.
+- D2: Confirm which XML features libmobi strictly requires (DTD, XInclude, XPath, Schemas, HTML). Owner: TBD. Target: TBD.
+- D3: Define acceptable performance vs. security tradeoffs for malformed files. Owner: TBD. Target: TBD.
+- D4: Primary hash algorithm: BLAKE3. Output format: raw bytes with optional hex helper. Owner: Jessie. Target: TBD.
+- D5: Bindings strategy: Rust `bindgen` + safe wrapper; Python `cffi`. Owner: Jessie. Target: TBD.
+
+## Success Criteria
+- No XXE or external entity loading in production for untrusted input.
+- No regression in libmobi parsing of known‑good content.
+- Measurable memory stability on large/hostile inputs.
+
+## Backlog (Unordered)
+- Add fuzz harnesses for high‑risk parsers (DTD, schema, HTML).
+- Add defensive limits for XPath (opLimit) in any evaluation paths used by libmobi.
+- Improve error reporting hooks for better crash triage in production.

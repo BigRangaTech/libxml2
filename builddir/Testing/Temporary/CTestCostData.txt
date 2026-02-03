@@ -1,0 +1,23 @@
+runtest 1 2.63444
+runsuite 1 0.196052
+testapi 1 0.00300282
+testcatalog 1 0.00272591
+testchar 1 0.458491
+testdict 1 0.64967
+testparser 1 0.668972
+testrecurse 1 0.92159
+scripts_base 1 0.0246596
+scripts_base2 1 0.0291524
+scripts_long_command 1 0.0267061
+scripts_set1 1 0.0245554
+scripts_set3 1 0.0347931
+scripts_set4 1 0.0277625
+scripts_whereis 1 0.036834
+catalogs_catal 1 0.0263099
+catalogs_docbook 1 0.0236889
+catalogs_recursive 1 0.0261935
+catalogs_registry 1 0.0250191
+catalogs_whites 1 0.0261395
+catalogs_whitex 1 0.0312604
+catalog_add_del 1 0.0618411
+---

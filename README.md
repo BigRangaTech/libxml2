@@ -15,6 +15,14 @@ Bugs should be reported at
 Documentation is available at
 <https://gitlab.gnome.org/GNOME/libxml2/-/wikis>
 
+## Fork Notes
+
+This fork tracks upstream but adds e-reader focused hardening and process
+artifacts:
+- `NEWS.md` for fork-specific changes.
+- `security_audit.md` for risk tracking and mitigations.
+- `testresults.md` to record test runs and outcomes.
+
 ## License
 
 This code is released under the MIT License, see the Copyright file.
@@ -162,6 +170,24 @@ See the `meson_options.txt` file for options. For example:
     -Dschemas=disabled
     -Dzlib=enabled
 
+## Testing
+
+The full test suite is run by your build system:
+
+- Autotools: `make check`
+- CMake: `ctest --test-dir builddir`
+- Meson: `meson test -C builddir`
+
+Additional targeted test executables are built in the tree. Typical runs:
+
+- `./runtest`
+- `./runxmlconf`
+- `./runsuite`
+- `./testlimits`
+- `./testrecurse`
+
+After any test run, update `testresults.md` with the command and result.
+
 ## Dependencies
 
 libxml2 supports POSIX and Windows operating systems.
@@ -188,7 +214,7 @@ The current version of the code can be found in GNOME's GitLab at
 is by creating issues and merge requests on GitLab.
 
 All code must conform to C89 and pass the GitLab CI tests. Add regression
-tests if possible.
+tests for new APIs or modules. Update `testresults.md` after running tests.
 
 ## Authors
 
@@ -198,4 +224,3 @@ tests if possible.
 - Igor Zlatkovic for the Windows port
 - Aleksey Sanin
 - Nick Wellnhofer
-

@@ -25,6 +25,7 @@
 #include "private/dict.h"
 #include "private/error.h"
 #include "private/globals.h"
+#include "private/parser.h"
 #include "private/threads.h"
 #include "private/tree.h"
 
@@ -221,6 +222,10 @@ static int xmlLoadExtDtdDefaultValueThrDef = 0;
 static int xmlPedanticParserDefaultValueThrDef = 0;
 static int xmlKeepBlanksDefaultValueThrDef = 1;
 static int xmlSubstituteEntitiesDefaultValueThrDef = 0;
+
+static unsigned xmlMaxAmplificationDefaultThrDef =
+        XML_MAX_AMPLIFICATION_DEFAULT;
+static size_t xmlDictDefaultLimitThrDef = 0;
 
 static xmlRegisterNodeFunc xmlRegisterNodeDefaultValueThrDef = NULL;
 static xmlDeregisterNodeFunc xmlDeregisterNodeDefaultValueThrDef = NULL;
@@ -1003,6 +1008,87 @@ int xmlThrDefLoadExtDtdDefaultValue(int v) {
 }
 
 /**
+ * Set the default maximum amplification factor for new parser contexts.
+ *
+ * A value of 0 is ignored.
+ *
+ * @param maxAmpl  new maximum amplification factor
+ * @returns the old value
+ */
+unsigned
+xmlSetMaxAmplificationDefault(unsigned maxAmpl)
+{
+    unsigned ret;
+
+    xmlInitParser();
+    xmlMutexLock(&xmlThrDefMutex);
+    ret = xmlMaxAmplificationDefaultThrDef;
+    if (maxAmpl > 0)
+        xmlMaxAmplificationDefaultThrDef = maxAmpl;
+    xmlMutexUnlock(&xmlThrDefMutex);
+
+    return ret;
+}
+
+/**
+ * Get the default maximum amplification factor for new parser contexts.
+ *
+ * @returns the current value
+ */
+unsigned
+xmlGetMaxAmplificationDefault(void)
+{
+    unsigned ret;
+
+    xmlInitParser();
+    xmlMutexLock(&xmlThrDefMutex);
+    ret = xmlMaxAmplificationDefaultThrDef;
+    xmlMutexUnlock(&xmlThrDefMutex);
+
+    return ret;
+}
+
+/**
+ * Set the default dictionary size limit for new dictionaries.
+ *
+ * A value of 0 disables the limit.
+ *
+ * @param limit  new limit in bytes
+ * @returns the old value
+ */
+size_t
+xmlDictSetDefaultLimit(size_t limit)
+{
+    size_t ret;
+
+    xmlInitParser();
+    xmlMutexLock(&xmlThrDefMutex);
+    ret = xmlDictDefaultLimitThrDef;
+    xmlDictDefaultLimitThrDef = limit;
+    xmlMutexUnlock(&xmlThrDefMutex);
+
+    return ret;
+}
+
+/**
+ * Get the default dictionary size limit for new dictionaries.
+ *
+ * @returns the current value in bytes, or 0 if unlimited
+ */
+size_t
+xmlDictGetDefaultLimit(void)
+{
+    size_t ret;
+
+    xmlInitParser();
+    xmlMutexLock(&xmlThrDefMutex);
+    ret = xmlDictDefaultLimitThrDef;
+    xmlMutexUnlock(&xmlThrDefMutex);
+
+    return ret;
+}
+
+/**
  * Set per-thread default value.
  *
  * @deprecated Use xmlParserOption XML_PARSE_PEDANTIC.
@@ -1134,4 +1220,3 @@ xmlThrDefOutputBufferCreateFilenameDefault(xmlOutputBufferCreateFilenameFunc fun
 
     return(old);
 }
-

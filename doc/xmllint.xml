@@ -81,6 +81,7 @@
             <arg choice="plain"><option>--nodict</option></arg>
             <arg choice="plain"><option>--noenc</option></arg>
             <arg choice="plain"><option>--noent</option></arg>
+            <arg choice="plain"><option>--no-xxe</option></arg>
             <arg choice="plain"><option>--nofixup-base-uris</option></arg>
             <arg choice="plain"><option>--noout</option></arg>
             <arg choice="plain"><option>--nonet</option></arg>
@@ -336,6 +337,17 @@
                     Substitute entity values for entity references. By default, &xmllint;
                     leaves entity references in place. This enables loading of
                     external DTDs and entities.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--no-xxe</option></term>
+            <listitem>
+                <para>
+                    Disable loading of external entities and DTDs
+                    (parser option XML_PARSE_NO_XXE). Recommended for
+                    untrusted input.
                 </para>
             </listitem>
         </varlistentry>

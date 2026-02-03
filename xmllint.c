@@ -2388,6 +2388,7 @@ static void usage(FILE *f, const char *name) {
     fprintf(f, "\t--recover : output what was parsable on broken XML documents\n");
     fprintf(f, "\t--huge : remove any internal arbitrary parser limits\n");
     fprintf(f, "\t--noent : substitute entity references by their value\n");
+    fprintf(f, "\t--no-xxe : disable loading of external entities\n");
     fprintf(f, "\t--noenc : ignore any encoding specified inside the document\n");
     fprintf(f, "\t--noout : don't output the result tree\n");
     fprintf(f, "\t--path 'paths': provide a set of paths for resources\n");
@@ -2627,6 +2628,9 @@ xmllintParseOptions(xmllintState *lint, int argc, const char **argv) {
         } else if ((!strcmp(argv[i], "-noent")) ||
                    (!strcmp(argv[i], "--noent"))) {
             lint->parseOptions |= XML_PARSE_NOENT;
+        } else if ((!strcmp(argv[i], "-no-xxe")) ||
+                   (!strcmp(argv[i], "--no-xxe"))) {
+            lint->parseOptions |= XML_PARSE_NO_XXE;
         } else if ((!strcmp(argv[i], "-noenc")) ||
                    (!strcmp(argv[i], "--noenc"))) {
             lint->parseOptions |= XML_PARSE_IGNORE_ENC;
@@ -3021,6 +3025,8 @@ xmllintParseOptions(xmllintState *lint, int argc, const char **argv) {
             xmllintOptWarnNoSupport(errStream, "--html", "--nodict");
         if (lint->parseOptions & XML_PARSE_NOENT)
             xmllintOptWarnNoSupport(errStream, "--html", "--noent");
+        if (lint->parseOptions & XML_PARSE_NO_XXE)
+            xmllintOptWarnNoSupport(errStream, "--html", "--no-xxe");
         if (lint->parseOptions & XML_PARSE_NONET)
             xmllintOptWarnNoSupport(errStream, "--html", "--nonet");
         if (lint->parseOptions & XML_PARSE_NSCLEAN)
@@ -3409,4 +3415,3 @@ error:
 
     return(lint->progresult);
 }
-

@@ -1980,6 +1980,22 @@ XMLPUBFUN void
 XMLPUBFUN void
 		xmlCtxtSetMaxAmplification(xmlParserCtxt *ctxt,
 					 unsigned maxAmpl);
+/**
+ * Set the default maximum amplification factor for new parser contexts.
+ *
+ * A value of 0 is ignored.
+ *
+ * @returns the old value
+ */
+XMLPUBFUN unsigned
+		xmlSetMaxAmplificationDefault(unsigned maxAmpl);
+/**
+ * Get the default maximum amplification factor for new parser contexts.
+ *
+ * @returns the current value
+ */
+XMLPUBFUN unsigned
+		xmlGetMaxAmplificationDefault(void);
 XMLPUBFUN xmlDoc *
 		xmlReadDoc		(const xmlChar *cur,
 					 const char *URL,

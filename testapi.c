@@ -177,6 +177,8 @@ main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED) {
     xmlCtxtSetDict(NULL, NULL);
     xmlCtxtSetErrorHandler(NULL, 0, NULL);
     xmlCtxtSetMaxAmplification(NULL, 0);
+    xmlSetMaxAmplificationDefault(1);
+    xmlGetMaxAmplificationDefault();
     xmlCtxtSetOptions(NULL, 0);
     xmlCtxtSetPrivate(NULL, NULL);
     xmlCtxtSetResourceLoader(NULL, 0, NULL);
@@ -204,6 +206,8 @@ main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED) {
     xmlDictQLookup(NULL, NULL, NULL);
     xmlDictReference(NULL);
     xmlDictSetLimit(NULL, 0);
+    xmlDictSetDefaultLimit(0);
+    xmlDictGetDefaultLimit();
     xmlDictSize(NULL);
     xmlFreeNode(xmlDocCopyNode(NULL, NULL, 0));
     xmlFreeNode(xmlDocCopyNodeList(NULL, NULL));
