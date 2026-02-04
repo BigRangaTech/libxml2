@@ -47,6 +47,7 @@
 #include "private/io.h"
 #include "private/memory.h"
 #include "private/parser.h"
+#include "private/threads.h"
 
 #ifndef SIZE_MAX
   #define SIZE_MAX ((size_t) -1)
@@ -57,6 +58,111 @@
 /*
  * Various global defaults for parsing
  */
+
+typedef struct _xmlErrorRingEntry {
+    xmlParserCtxt *ctxt;
+    xmlError *errors;
+    int size;
+    int count;
+    int next;
+    struct _xmlErrorRingEntry *nextEntry;
+} xmlErrorRingEntry;
+
+static xmlErrorRingEntry *xmlErrorRingList = NULL;
+static xmlMutex xmlErrorRingMutex;
+static int xmlErrorRingMutexInitialized = 0;
+
+static void
+xmlInitErrorRingMutex(void) {
+    if (xmlErrorRingMutexInitialized)
+        return;
+    xmlInitMutex(&xmlErrorRingMutex);
+    xmlErrorRingMutexInitialized = 1;
+}
+
+static void
+xmlErrorRingLock(void) {
+    if (!xmlErrorRingMutexInitialized)
+        xmlInitErrorRingMutex();
+    xmlMutexLock(&xmlErrorRingMutex);
+}
+
+static void
+xmlErrorRingUnlock(void) {
+    xmlMutexUnlock(&xmlErrorRingMutex);
+}
+
+static xmlErrorRingEntry *
+xmlErrorRingLookup(xmlParserCtxt *ctxt) {
+    xmlErrorRingEntry *entry = xmlErrorRingList;
+
+    while (entry != NULL) {
+        if (entry->ctxt == ctxt)
+            return entry;
+        entry = entry->nextEntry;
+    }
+
+    return NULL;
+}
+
+static void
+xmlErrorRingClear(xmlErrorRingEntry *entry) {
+    int i;
+
+    if ((entry == NULL) || (entry->errors == NULL))
+        return;
+
+    for (i = 0; i < entry->size; i++) {
+        if (entry->errors[i].code != XML_ERR_OK)
+            xmlResetError(&entry->errors[i]);
+    }
+    entry->count = 0;
+    entry->next = 0;
+}
+
+static void
+xmlErrorRingFreeEntry(xmlErrorRingEntry *entry) {
+    if (entry == NULL)
+        return;
+
+    if (entry->errors != NULL) {
+        xmlErrorRingClear(entry);
+        xmlFree(entry->errors);
+    }
+    xmlFree(entry);
+}
+
+static void
+xmlCtxtStoreErrorRing(xmlParserCtxt *ctxt) {
+    xmlErrorRingEntry *entry;
+    int idx;
+
+    if ((ctxt == NULL) || (ctxt->lastError.code == XML_ERR_OK))
+        return;
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingLookup(ctxt);
+    if ((entry == NULL) || (entry->size <= 0)) {
+        xmlErrorRingUnlock();
+        return;
+    }
+
+    idx = entry->next;
+    if (entry->errors[idx].code != XML_ERR_OK)
+        xmlResetError(&entry->errors[idx]);
+
+    if (xmlCopyError(&ctxt->lastError, &entry->errors[idx]) < 0) {
+        xmlResetError(&entry->errors[idx]);
+        xmlErrorRingUnlock();
+        return;
+    }
+
+    entry->next = (idx + 1) % entry->size;
+    if (entry->count < entry->size)
+        entry->count += 1;
+
+    xmlErrorRingUnlock();
+}
 
 static const char *
 xmlResourceTypeToString(xmlResourceType type) {
@@ -77,6 +183,107 @@ xmlResourceTypeToString(xmlResourceType type) {
         default:
             return("unknown");
     }
+}
+
+static const char *
+xmlParserStateToString(xmlParserInputState state) {
+    switch (state) {
+        case XML_PARSER_EOF:
+            return("eof");
+        case XML_PARSER_START:
+            return("start");
+        case XML_PARSER_MISC:
+            return("misc");
+        case XML_PARSER_PI:
+            return("pi");
+        case XML_PARSER_DTD:
+            return("dtd");
+        case XML_PARSER_PROLOG:
+            return("prolog");
+        case XML_PARSER_COMMENT:
+            return("comment");
+        case XML_PARSER_START_TAG:
+            return("start-tag");
+        case XML_PARSER_CONTENT:
+            return("content");
+        case XML_PARSER_CDATA_SECTION:
+            return("cdata");
+        case XML_PARSER_END_TAG:
+            return("end-tag");
+        case XML_PARSER_ENTITY_DECL:
+            return("entity-decl");
+        case XML_PARSER_ENTITY_VALUE:
+            return("entity-value");
+        case XML_PARSER_ATTRIBUTE_VALUE:
+            return("attribute-value");
+        case XML_PARSER_SYSTEM_LITERAL:
+            return("system-literal");
+        case XML_PARSER_EPILOG:
+            return("epilog");
+        case XML_PARSER_IGNORE:
+            return("ignore");
+        case XML_PARSER_PUBLIC_LITERAL:
+            return("public-literal");
+        case XML_PARSER_XML_DECL:
+            return("xml-decl");
+        default:
+            return("unknown");
+    }
+}
+
+static const char *
+xmlHtmlParserStateToString(xmlParserInputState state) {
+    switch (state) {
+        case XML_PARSER_EOF:
+            return("html-eof");
+        case XML_PARSER_START:
+            return("html-start");
+        case XML_PARSER_MISC:
+            return("html-misc");
+        case XML_PARSER_PI:
+            return("html-pi");
+        case XML_PARSER_DTD:
+            return("html-dtd");
+        case XML_PARSER_PROLOG:
+            return("html-prolog");
+        case XML_PARSER_COMMENT:
+            return("html-comment");
+        case XML_PARSER_START_TAG:
+            return("html-start-tag");
+        case XML_PARSER_CONTENT:
+            return("html-content");
+        case XML_PARSER_CDATA_SECTION:
+            return("html-cdata");
+        case XML_PARSER_END_TAG:
+            return("html-end-tag");
+        case XML_PARSER_ENTITY_DECL:
+            return("html-entity-decl");
+        case XML_PARSER_ENTITY_VALUE:
+            return("html-entity-value");
+        case XML_PARSER_ATTRIBUTE_VALUE:
+            return("html-attribute-value");
+        case XML_PARSER_SYSTEM_LITERAL:
+            return("html-system-literal");
+        case XML_PARSER_EPILOG:
+            return("html-epilog");
+        case XML_PARSER_IGNORE:
+            return("html-ignore");
+        case XML_PARSER_PUBLIC_LITERAL:
+            return("html-public-literal");
+        case XML_PARSER_XML_DECL:
+            return("html-xml-decl");
+        default:
+            return("html-unknown");
+    }
+}
+
+static const char *
+xmlCtxtGetStage(xmlParserCtxt *ctxt) {
+    if (ctxt == NULL)
+        return(NULL);
+    if (ctxt->html)
+        return(xmlHtmlParserStateToString(ctxt->instate));
+    return(xmlParserStateToString(ctxt->instate));
 }
 
 static void
@@ -104,6 +311,60 @@ xmlResourceFlagsToString(xmlParserInputFlags flags, char *buf, size_t size) {
     if (used == 0) {
         snprintf(buf, size, "NONE");
     }
+}
+
+static void
+xmlCtxtGetErrorHandlers(xmlParserCtxt *ctxt, xmlErrorDomain domain,
+                        xmlErrorLevel level,
+                        xmlStructuredErrorFunc *schannel,
+                        xmlGenericErrorFunc *channel,
+                        void **data) {
+    *schannel = NULL;
+    *channel = NULL;
+    *data = NULL;
+
+    if (ctxt->errorHandler) {
+        *schannel = ctxt->errorHandler;
+        *data = ctxt->errorCtxt;
+    } else if ((ctxt->sax->initialized == XML_SAX2_MAGIC) &&
+               (ctxt->sax->serror != NULL)) {
+        *schannel = ctxt->sax->serror;
+        *data = ctxt->userData;
+    } else if ((domain == XML_FROM_VALID) || (domain == XML_FROM_DTD)) {
+        if (level == XML_ERR_WARNING)
+            *channel = ctxt->vctxt.warning;
+        else
+            *channel = ctxt->vctxt.error;
+        *data = ctxt->vctxt.userData;
+    } else {
+        if (level == XML_ERR_WARNING)
+            *channel = ctxt->sax->warning;
+        else
+            *channel = ctxt->sax->error;
+        *data = ctxt->userData;
+    }
+}
+
+static void
+xmlCtxtReportErrorLimit(xmlParserCtxt *ctxt, xmlErrorDomain domain,
+                        xmlErrorLevel level, const char *stage,
+                        int isWarningLimit) {
+    xmlStructuredErrorFunc schannel = NULL;
+    xmlGenericErrorFunc channel = NULL;
+    void *data = NULL;
+    const char *which = isWarningLimit ? "warnings" : "errors";
+    const char *stageStr = stage ? stage : "unknown";
+
+    if (ctxt == NULL)
+        return;
+
+    xmlCtxtGetErrorHandlers(ctxt, domain, level, &schannel, &channel, &data);
+
+    xmlRaiseError(schannel, channel, data, ctxt, NULL, domain,
+                  XML_ERR_RESOURCE_LIMIT, level, NULL, 0,
+                  NULL, NULL, stageStr, 0, 0,
+                  "Too many %s; further %s suppressed (stage=%s)\n",
+                  which, which, stageStr);
 }
 
 static xmlErrorLevel
@@ -152,8 +413,181 @@ xmlCtxtErrIOResource(xmlParserCtxt *ctxt, int code, const char *uri,
     xmlCtxtErr(ctxt, NULL, XML_FROM_IO, code, level,
                (const xmlChar *) uri, (const xmlChar *) typeStr,
                (const xmlChar *) reason, 0,
-               "%s for \"%s\": %s (type=%s, flags=%s)\n",
+               "%s for \"%s\": %s (type=%s, flags=%s, stage=resource)\n",
                reason, uri, errstr, typeStr, flagsBuf);
+}
+
+/**
+ * Set the size of the per-context error ring buffer.
+ *
+ * If size is 0, the ring buffer is disabled and any stored errors
+ * are freed.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @param size  number of errors to keep (0 disables)
+ * @returns 0 on success, -1 on error.
+ */
+int
+xmlCtxtSetErrorRingSize(xmlParserCtxt *ctxt, int size) {
+    xmlErrorRingEntry *entry;
+    xmlErrorRingEntry *prev;
+
+    if ((ctxt == NULL) || (size < 0))
+        return(-1);
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingList;
+    prev = NULL;
+    while (entry != NULL) {
+        if (entry->ctxt == ctxt)
+            break;
+        prev = entry;
+        entry = entry->nextEntry;
+    }
+
+    if (size == 0) {
+        if (entry != NULL) {
+            if (prev != NULL)
+                prev->nextEntry = entry->nextEntry;
+            else
+                xmlErrorRingList = entry->nextEntry;
+            xmlErrorRingFreeEntry(entry);
+        }
+        xmlErrorRingUnlock();
+        return(0);
+    }
+
+    if (entry == NULL) {
+        entry = xmlMalloc(sizeof(*entry));
+        if (entry == NULL) {
+            xmlErrorRingUnlock();
+            return(-1);
+        }
+        memset(entry, 0, sizeof(*entry));
+        entry->ctxt = ctxt;
+        entry->nextEntry = xmlErrorRingList;
+        xmlErrorRingList = entry;
+    }
+
+    if (entry->size != size) {
+        if (entry->errors != NULL) {
+            xmlErrorRingClear(entry);
+            xmlFree(entry->errors);
+            entry->errors = NULL;
+        }
+
+        entry->errors = xmlMalloc(sizeof(xmlError) * size);
+        if (entry->errors == NULL) {
+            xmlErrorRingUnlock();
+            return(-1);
+        }
+        memset(entry->errors, 0, sizeof(xmlError) * size);
+        entry->size = size;
+        entry->count = 0;
+        entry->next = 0;
+    }
+
+    xmlErrorRingUnlock();
+    return(0);
+}
+
+/**
+ * Get the configured size of the per-context error ring buffer.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @returns ring size or 0 if disabled or ctxt is NULL.
+ */
+int
+xmlCtxtGetErrorRingSize(xmlParserCtxt *ctxt) {
+    xmlErrorRingEntry *entry;
+    int size = 0;
+
+    if (ctxt == NULL)
+        return(0);
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingLookup(ctxt);
+    if (entry != NULL)
+        size = entry->size;
+    xmlErrorRingUnlock();
+
+    return(size);
+}
+
+/**
+ * Reset the per-context error ring buffer.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ */
+void
+xmlCtxtResetErrorRing(xmlParserCtxt *ctxt) {
+    xmlErrorRingEntry *entry;
+
+    if (ctxt == NULL)
+        return;
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingLookup(ctxt);
+    if (entry != NULL)
+        xmlErrorRingClear(entry);
+    xmlErrorRingUnlock();
+}
+
+/**
+ * Copy errors from the per-context error ring buffer.
+ *
+ * Errors are copied from oldest to newest. The caller must call
+ * xmlResetError on each copied element to free internal strings.
+ *
+ * If `errors` is NULL or `max` is 0, the number of stored errors
+ * is returned without copying.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @param errors  output array
+ * @param max  maximum number of errors to copy
+ * @returns number of errors copied or available, or -1 on error.
+ */
+int
+xmlCtxtGetErrorRing(xmlParserCtxt *ctxt, xmlError *errors, int max) {
+    xmlErrorRingEntry *entry;
+    int count;
+    int i;
+    int start;
+
+    if (ctxt == NULL)
+        return(-1);
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingLookup(ctxt);
+    if ((entry == NULL) || (entry->size == 0)) {
+        xmlErrorRingUnlock();
+        return(0);
+    }
+
+    count = entry->count;
+    if ((errors == NULL) || (max <= 0)) {
+        xmlErrorRingUnlock();
+        return(count);
+    }
+
+    if (count > max)
+        count = max;
+
+    start = (entry->count < entry->size) ? 0 : entry->next;
+    for (i = 0; i < count; i++) {
+        int idx = (start + i) % entry->size;
+        if (xmlCopyError(&entry->errors[idx], &errors[i]) < 0) {
+            xmlErrorRingUnlock();
+            return(-1);
+        }
+    }
+
+    xmlErrorRingUnlock();
+    return(count);
 }
 
 /**
@@ -378,6 +812,7 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
     int line = 0;
     int col = 0;
     int res;
+    const char *stage = NULL;
 
     if (code == XML_ERR_NO_MEMORY) {
         xmlCtxtErrMemory(ctxt);
@@ -402,9 +837,18 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
     if (xmlCtxtIsCatastrophicError(ctxt))
         return;
 
+    stage = xmlCtxtGetStage(ctxt);
+    if ((str3 == NULL) && (stage != NULL))
+        str3 = (const xmlChar *) stage;
+
     if (level == XML_ERR_WARNING) {
-        if (ctxt->nbWarnings >= XML_MAX_ERRORS)
+        if (ctxt->nbWarnings >= XML_MAX_ERRORS) {
+            if (ctxt->nbWarnings == XML_MAX_ERRORS) {
+                xmlCtxtReportErrorLimit(ctxt, domain, level, stage, 1);
+                ctxt->nbWarnings += 1;
+            }
             return;
+        }
         ctxt->nbWarnings += 1;
     } else {
         /*
@@ -422,8 +866,13 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
         } else {
             /* Report at least one fatal error. */
             if (ctxt->nbErrors >= XML_MAX_ERRORS &&
-                (level < XML_ERR_FATAL || ctxt->wellFormed == 0))
+                (level < XML_ERR_FATAL || ctxt->wellFormed == 0)) {
+                if (ctxt->nbErrors == XML_MAX_ERRORS) {
+                    xmlCtxtReportErrorLimit(ctxt, domain, level, stage, 0);
+                    ctxt->nbErrors += 1;
+                }
                 return;
+            }
 
             if (level == XML_ERR_FATAL && ctxt->recovery == 0)
                 ctxt->disableSAX = 1;
@@ -481,6 +930,8 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
         xmlCtxtErrMemory(ctxt);
         return;
     }
+
+    xmlCtxtStoreErrorRing(ctxt);
 }
 
 /**
@@ -3161,6 +3612,8 @@ xmlFreeParserCtxt(xmlParserCtxt *ctxt)
     if (ctxt->catalogs != NULL)
 	xmlCatalogFreeLocal(ctxt->catalogs);
 #endif
+    xmlCtxtSetErrorRingSize(ctxt, 0);
+
     xmlFree(ctxt);
 }
 

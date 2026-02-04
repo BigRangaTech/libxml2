@@ -13,6 +13,7 @@
 #include <libxml/xmlreader.h>
 #include <libxml/xmlsave.h>
 #include <libxml/xmlwriter.h>
+#include <libxml/xmlerror.h>
 #include <libxml/HTMLparser.h>
 #include <libxml/HTMLtree.h>
 
@@ -24,6 +25,11 @@ ignoreError(void *ctxt ATTRIBUTE_UNUSED,
             const xmlError *error ATTRIBUTE_UNUSED) {
 }
 #endif
+
+static void
+ignoreStructuredError(void *ctxt ATTRIBUTE_UNUSED,
+                      const xmlError *error ATTRIBUTE_UNUSED) {
+}
 
 static int
 testNewDocNode(void) {
@@ -198,6 +204,58 @@ testInvalidCharRecovery(void) {
     }
 
     xmlFreeDoc(doc);
+
+    return err;
+}
+
+static int
+testErrorRing(void) {
+    xmlParserCtxtPtr ctxt;
+    xmlDocPtr doc;
+    xmlError errors[2];
+    xmlChar *json = NULL;
+    int len = 0;
+    int count;
+    int i;
+    int err = 0;
+
+    ctxt = xmlNewParserCtxt();
+    if (ctxt == NULL) {
+        fprintf(stderr, "xmlNewParserCtxt failed\n");
+        return 1;
+    }
+
+    xmlCtxtSetErrorHandler(ctxt, ignoreStructuredError, NULL);
+    xmlCtxtSetErrorRingSize(ctxt, 2);
+
+    doc = xmlCtxtReadDoc(ctxt, BAD_CAST "<doc>", NULL, NULL, 0);
+    if (doc != NULL)
+        xmlFreeDoc(doc);
+
+    count = xmlCtxtGetErrorRing(ctxt, errors, 2);
+    if (count <= 0) {
+        fprintf(stderr, "error ring is empty\n");
+        err = 1;
+    } else {
+        if (xmlErrorToJson(&errors[0], &json, &len) != 0 ||
+            (json == NULL) || (len <= 0)) {
+            fprintf(stderr, "xmlErrorToJson failed\n");
+            err = 1;
+        }
+    }
+
+    xmlFree(json);
+
+    for (i = 0; i < count; i++)
+        xmlResetError(&errors[i]);
+
+    xmlCtxtResetErrorRing(ctxt);
+    if (xmlCtxtGetErrorRing(ctxt, NULL, 0) != 0) {
+        fprintf(stderr, "error ring reset failed\n");
+        err = 1;
+    }
+
+    xmlFreeParserCtxt(ctxt);
 
     return err;
 }
@@ -1609,6 +1667,7 @@ main(void) {
     err |= testCFileIO();
     err |= testUndeclEntInContent();
     err |= testInvalidCharRecovery();
+    err |= testErrorRing();
     err |= testRequireResourceLoader();
     err |= testResourcePolicy();
     err |= testCtxtInputGetters();

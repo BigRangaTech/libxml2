@@ -14,6 +14,7 @@
 #define __XML_ERROR_H__
 
 #include <libxml/xmlversion.h>
+#include <libxml/xmlstring.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -1058,6 +1059,21 @@ XMLPUBFUN void
 XMLPUBFUN int
     xmlCopyError		(const xmlError *from,
 				 xmlError *to);
+/**
+ * Convert an xmlError to a JSON string.
+ *
+ * The returned string must be freed with xmlFree.
+ *
+ * @since 2.16.0
+ * @param err  error to convert
+ * @param out  output pointer for JSON string
+ * @param len  output length in bytes (optional)
+ * @returns 0 on success, -1 on error.
+ */
+XMLPUBFUN int
+    xmlErrorToJson		(const xmlError *err,
+				 xmlChar **out,
+				 int *len);
 
 #ifdef __cplusplus
 }

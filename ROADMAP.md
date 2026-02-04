@@ -34,6 +34,10 @@ Current State (2026-02-03):
   (for example `appcache://` and `file:///data/ereader/`).
 - App-side: install a structured error handler to capture libxml2 error
   context (URI/type/reason) and map it to ebook IDs and parse stages.
+- Library-side: ensure error throttling emits a single "limit reached"
+  message and includes parse stage info where available.
+- Library-side: add a per-context error ring buffer and JSON formatter
+  helper for app telemetry.
 - Add a build-time switch to hard-enforce safe defaults in libxml2 for legacy APIs (opt-in; does not change default behavior unless enabled).
 - Set a strict amplification factor via `xmlCtxtSetMaxAmplification` for untrusted input.
 - Add/enable limits for dictionary size and node sizes when reading untrusted documents.

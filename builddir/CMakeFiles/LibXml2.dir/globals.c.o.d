@@ -57,9 +57,10 @@ CMakeFiles/LibXml2.dir/globals.c.o: \
  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlerror.h \
+ /home/jessie/Documents/libxml2/include/libxml/xmlstring.h \
+ /usr/lib/gcc/x86_64-linux-gnu/15/include/stdarg.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlmemory.h \
- /usr/include/stdio.h /usr/lib/gcc/x86_64-linux-gnu/15/include/stdarg.h \
- /usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h \
+ /usr/include/stdio.h /usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h \
  /usr/include/x86_64-linux-gnu/bits/types/__FILE.h \
@@ -81,7 +82,6 @@ CMakeFiles/LibXml2.dir/globals.c.o: \
  /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
  /usr/include/x86_64-linux-gnu/bits/pthread_stack_min.h \
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
- /home/jessie/Documents/libxml2/include/libxml/xmlstring.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlregexp.h \
  /home/jessie/Documents/libxml2/include/libxml/HTMLparser.h \
  /home/jessie/Documents/libxml2/include/libxml/parser.h \

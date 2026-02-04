@@ -1490,6 +1490,7 @@ CMakeFiles/LibXml2.dir/list.c.o: /home/jessie/Documents/libxml2/list.c \
   /home/jessie/Documents/libxml2/include/libxml/xmlerror.h \
   /home/jessie/Documents/libxml2/include/libxml/xmlexports.h \
   /home/jessie/Documents/libxml2/include/libxml/xmlmemory.h \
+  /home/jessie/Documents/libxml2/include/libxml/xmlstring.h \
   /home/jessie/Documents/libxml2/libxml.h \
   /usr/include/alloca.h \
   /usr/include/endian.h \

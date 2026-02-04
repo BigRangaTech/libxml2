@@ -104,6 +104,37 @@ Resource loader/policy failures include extra context in `str1` (URI),
 `str2` (resource type), and `str3` (reason). The message also includes
 flags like `UNZIP` or `NETWORK`.
 
+For general parser errors, `str3` is set to the current parse stage
+when available (for example `prolog`, `content`, or `dtd`).
+
+You can also enable a per-context error ring buffer to keep the last
+N errors for postmortem analysis:
+
+```c
+xmlParserCtxt *ctxt = xmlNewParserCtxt();
+xmlCtxtSetErrorRingSize(ctxt, 16);
+/* ... parse ... */
+int count = xmlCtxtGetErrorRing(ctxt, NULL, 0);
+xmlError *errs = calloc(count, sizeof(*errs));
+xmlCtxtGetErrorRing(ctxt, errs, count);
+/* ... use errs ... */
+for (int i = 0; i < count; i++) {
+    xmlResetError(&errs[i]);
+}
+free(errs);
+```
+
+If you need structured telemetry, use `xmlErrorToJson`:
+
+```c
+xmlChar *json = NULL;
+int len = 0;
+if (xmlErrorToJson(err, &json, &len) == 0) {
+    /* send json */
+    xmlFree(json);
+}
+```
+
 ## Build instructions
 
 libxml2 can be built with GNU Autotools, CMake or meson.

@@ -9,6 +9,10 @@ on what changed and why it matters.
   `-D LIBXML2_WITH_SECURE_DEFAULTS=ON`, `-Dsecure-defaults=true`).
 - Diagnostics: Improved resource load error reporting with resource type,
   flags, and reason for loader/policy failures.
+- Diagnostics: Added parse-stage tagging in structured errors and a one-time
+  warning when error/warning limits are reached.
+- Diagnostics: Added per-context error ring buffers and a JSON formatter
+  helper for structured telemetry.
 ## 2026-02-03
 - Security: Added `/dev/urandom` fallback for RNG seeding on older POSIX
   systems to avoid weak time-based seeds when no modern entropy API exists.

@@ -72,6 +72,7 @@ CMakeFiles/LibXml2.dir/xmlreader.c.o: \
  /home/jessie/Documents/libxml2/include/libxml/xmlIO.h \
  /home/jessie/Documents/libxml2/include/libxml/encoding.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlerror.h \
+ /home/jessie/Documents/libxml2/include/libxml/xmlstring.h \
  /home/jessie/Documents/libxml2/include/libxml/tree.h \
  /usr/lib/gcc/x86_64-linux-gnu/15/include/limits.h \
  /usr/lib/gcc/x86_64-linux-gnu/15/include/syslimits.h \
@@ -81,7 +82,6 @@ CMakeFiles/LibXml2.dir/xmlreader.c.o: \
  /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
  /usr/include/x86_64-linux-gnu/bits/pthread_stack_min.h \
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
- /home/jessie/Documents/libxml2/include/libxml/xmlstring.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlregexp.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlreader.h \
  /home/jessie/Documents/libxml2/include/libxml/parser.h \

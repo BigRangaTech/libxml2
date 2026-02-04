@@ -11,8 +11,10 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <libxml/parser.h>
+#include <libxml/tree.h>
 #include <libxml/xmlerror.h>
 #include <libxml/xmlmemory.h>
 
@@ -1002,6 +1004,156 @@ xmlCopyError(const xmlError *from, xmlError *to) {
                        from->str1, from->str2, from->str3,
                        from->int1, from->int2,
                        fmt, from->message));
+}
+
+static int
+xmlJsonEscape(xmlBufferPtr buf, const char *str) {
+    char tmp[7];
+    const unsigned char *cur;
+
+    if (str == NULL)
+        return(xmlBufferAdd(buf, BAD_CAST "null", 4));
+
+    if (xmlBufferAdd(buf, BAD_CAST "\"", 1) != 0)
+        return(-1);
+
+    for (cur = (const unsigned char *) str; *cur != '\0'; cur++) {
+        switch (*cur) {
+            case '\"':
+                if (xmlBufferAdd(buf, BAD_CAST "\\\"", 2) != 0)
+                    return(-1);
+                break;
+            case '\\':
+                if (xmlBufferAdd(buf, BAD_CAST "\\\\", 2) != 0)
+                    return(-1);
+                break;
+            case '\b':
+                if (xmlBufferAdd(buf, BAD_CAST "\\b", 2) != 0)
+                    return(-1);
+                break;
+            case '\f':
+                if (xmlBufferAdd(buf, BAD_CAST "\\f", 2) != 0)
+                    return(-1);
+                break;
+            case '\n':
+                if (xmlBufferAdd(buf, BAD_CAST "\\n", 2) != 0)
+                    return(-1);
+                break;
+            case '\r':
+                if (xmlBufferAdd(buf, BAD_CAST "\\r", 2) != 0)
+                    return(-1);
+                break;
+            case '\t':
+                if (xmlBufferAdd(buf, BAD_CAST "\\t", 2) != 0)
+                    return(-1);
+                break;
+            default:
+                if (*cur < 0x20) {
+                    snprintf(tmp, sizeof(tmp), "\\u%04x", *cur);
+                    if (xmlBufferAdd(buf, BAD_CAST tmp, 6) != 0)
+                        return(-1);
+                } else {
+                    if (xmlBufferAdd(buf, BAD_CAST cur, 1) != 0)
+                        return(-1);
+                }
+        }
+    }
+
+    return(xmlBufferAdd(buf, BAD_CAST "\"", 1));
+}
+
+static int
+xmlJsonAddInt(xmlBufferPtr buf, int value) {
+    char tmp[32];
+    int len;
+
+    len = snprintf(tmp, sizeof(tmp), "%d", value);
+    if (len <= 0)
+        return(-1);
+    return(xmlBufferAdd(buf, BAD_CAST tmp, len));
+}
+
+/**
+ * Convert an xmlError to a JSON string.
+ *
+ * The returned string must be freed with xmlFree.
+ *
+ * @since 2.16.0
+ * @param err  error to convert
+ * @param out  output pointer for JSON string
+ * @param len  output length in bytes (optional)
+ * @returns 0 on success, -1 on error.
+ */
+int
+xmlErrorToJson(const xmlError *err, xmlChar **out, int *len) {
+    xmlBufferPtr buf;
+    xmlChar *result;
+    int ret = -1;
+
+    if ((err == NULL) || (out == NULL))
+        return(-1);
+
+    buf = xmlBufferCreate();
+    if (buf == NULL)
+        return(-1);
+
+    if (xmlBufferAdd(buf, BAD_CAST "{", 1) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST "\"domain\":", 9) != 0)
+        goto cleanup;
+    if (xmlJsonAddInt(buf, err->domain) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"code\":", 8) != 0)
+        goto cleanup;
+    if (xmlJsonAddInt(buf, err->code) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"level\":", 9) != 0)
+        goto cleanup;
+    if (xmlJsonAddInt(buf, err->level) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"file\":", 8) != 0)
+        goto cleanup;
+    if (xmlJsonEscape(buf, err->file) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"line\":", 8) != 0)
+        goto cleanup;
+    if (xmlJsonAddInt(buf, err->line) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"column\":", 10) != 0)
+        goto cleanup;
+    if (xmlJsonAddInt(buf, err->int2) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"message\":", 11) != 0)
+        goto cleanup;
+    if (xmlJsonEscape(buf, err->message) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"str1\":", 8) != 0)
+        goto cleanup;
+    if (xmlJsonEscape(buf, err->str1) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"str2\":", 8) != 0)
+        goto cleanup;
+    if (xmlJsonEscape(buf, err->str2) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ",\"str3\":", 8) != 0)
+        goto cleanup;
+    if (xmlJsonEscape(buf, err->str3) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST "}", 1) != 0)
+        goto cleanup;
+
+    result = xmlStrdup(xmlBufferContent(buf));
+    if (result == NULL)
+        goto cleanup;
+
+    *out = result;
+    if (len != NULL)
+        *len = xmlBufferLength(buf);
+    ret = 0;
+
+cleanup:
+    xmlBufferFree(buf);
+    return(ret);
 }
 
 /**

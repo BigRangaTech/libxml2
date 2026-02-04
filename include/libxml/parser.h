@@ -2000,6 +2000,55 @@ XMLPUBFUN void
 		xmlCtxtSetErrorHandler	(xmlParserCtxt *ctxt,
 					 xmlStructuredErrorFunc handler,
 					 void *data);
+/**
+ * Configure the per-context error ring buffer.
+ *
+ * If size is 0, the ring buffer is disabled.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @param size  number of errors to keep (0 disables)
+ * @returns 0 on success, -1 on error.
+ */
+XMLPUBFUN int
+		xmlCtxtSetErrorRingSize	(xmlParserCtxt *ctxt,
+					 int size);
+/**
+ * Get the configured error ring buffer size.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @returns ring size or 0 if disabled.
+ */
+XMLPUBFUN int
+		xmlCtxtGetErrorRingSize	(xmlParserCtxt *ctxt);
+/**
+ * Reset the error ring buffer.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ */
+XMLPUBFUN void
+		xmlCtxtResetErrorRing	(xmlParserCtxt *ctxt);
+/**
+ * Copy errors from the error ring buffer.
+ *
+ * Errors are copied from oldest to newest. The caller must call
+ * xmlResetError on each copied element to free internal strings.
+ *
+ * If `errors` is NULL or `max` is 0, the number of stored errors
+ * is returned without copying.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @param errors  output array
+ * @param max  maximum number of errors to copy
+ * @returns number of errors copied or available, or -1 on error.
+ */
+XMLPUBFUN int
+		xmlCtxtGetErrorRing	(xmlParserCtxt *ctxt,
+					 xmlError *errors,
+					 int max);
 XMLPUBFUN void
 		xmlCtxtSetResourceLoader(xmlParserCtxt *ctxt,
 					 xmlResourceLoader loader,

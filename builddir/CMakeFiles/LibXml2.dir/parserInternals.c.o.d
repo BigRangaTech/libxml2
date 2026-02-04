@@ -105,4 +105,14 @@ CMakeFiles/LibXml2.dir/parserInternals.c.o: \
  /home/jessie/Documents/libxml2/include/private/io.h \
  /home/jessie/Documents/libxml2/include/private/memory.h \
  /home/jessie/Documents/libxml2/include/private/../../libxml.h \
- /home/jessie/Documents/libxml2/include/private/parser.h
+ /home/jessie/Documents/libxml2/include/private/parser.h \
+ /home/jessie/Documents/libxml2/include/private/threads.h \
+ /usr/include/pthread.h /usr/include/sched.h \
+ /usr/include/x86_64-linux-gnu/bits/sched.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h \
+ /usr/include/x86_64-linux-gnu/bits/cpu-set.h /usr/include/time.h \
+ /usr/include/x86_64-linux-gnu/bits/time.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h \
+ /usr/include/x86_64-linux-gnu/bits/setjmp.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h

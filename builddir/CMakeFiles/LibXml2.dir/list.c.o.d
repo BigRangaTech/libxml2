@@ -69,4 +69,5 @@ CMakeFiles/LibXml2.dir/list.c.o: /home/jessie/Documents/libxml2/list.c \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
  /home/jessie/Documents/libxml2/include/libxml/xmlerror.h \
+ /home/jessie/Documents/libxml2/include/libxml/xmlstring.h \
  /home/jessie/Documents/libxml2/include/libxml/list.h
