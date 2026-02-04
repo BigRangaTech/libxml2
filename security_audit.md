@@ -4,7 +4,7 @@ Purpose: track potential risk areas, audit status, and mitigations for this fork
 This is a living document; update it whenever security-relevant behavior changes.
 
 ## Audit Status
-- Last reviewed: 2026-02-03
+- Last reviewed: 2026-02-04
 - Scope: parser defaults, entity expansion limits, dictionary limits, resource loading
 
 ## Potential Risk Areas (Non-Exhaustive)
@@ -24,13 +24,15 @@ This is a living document; update it whenever security-relevant behavior changes
 - Use `XML_PARSE_REQUIRE_LOADER` with `xmlCtxtSetResourceLoader` to enforce
   DRM-style resource control.
 - Use `xmlCtxtSetResourcePolicy` to approve/deny external resource loads.
+- Optionally build with secure defaults (`--with-secure-defaults`) for
+  legacy APIs that don't take explicit options.
 - Avoid DTD validation and external resource loading for untrusted data.
 
 ## Open Questions
-- Do we want library-wide safe defaults for legacy APIs (opt-in build flag)?
 - Which libmobi parsing paths still need additional hardening?
 
 ## Change Log
+- 2026-02-04: Added opt-in build flag for secure default parser options.
 - 2026-02-03: Added global defaults for max amplification and dict limits.
 - 2026-02-03: Added xmllint `--no-xxe` option and RNG `/dev/urandom` fallback.
 - 2026-02-03: Added resource loader requirement and resource policy hooks.

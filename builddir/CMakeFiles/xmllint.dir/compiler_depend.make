@@ -61,8 +61,8 @@ CMakeFiles/xmllint.dir/lintmain.c.o: /home/jessie/Documents/libxml2/lintmain.c \
   /usr/lib/gcc/x86_64-linux-gnu/15/include/syslimits.h
 
 CMakeFiles/xmllint.dir/shell.c.o: /home/jessie/Documents/libxml2/shell.c \
-  config.h \
   libxml/xmlversion.h \
+  /home/jessie/Documents/libxml2/config.h \
   /home/jessie/Documents/libxml2/include/libxml/HTMLparser.h \
   /home/jessie/Documents/libxml2/include/libxml/HTMLtree.h \
   /home/jessie/Documents/libxml2/include/libxml/SAX2.h \
@@ -181,8 +181,8 @@ CMakeFiles/xmllint.dir/shell.c.o: /home/jessie/Documents/libxml2/shell.c \
   /usr/lib/gcc/x86_64-linux-gnu/15/include/syslimits.h
 
 CMakeFiles/xmllint.dir/xmllint.c.o: /home/jessie/Documents/libxml2/xmllint.c \
-  config.h \
   libxml/xmlversion.h \
+  /home/jessie/Documents/libxml2/config.h \
   /home/jessie/Documents/libxml2/include/libxml/HTMLparser.h \
   /home/jessie/Documents/libxml2/include/libxml/HTMLtree.h \
   /home/jessie/Documents/libxml2/include/libxml/SAX2.h \
@@ -541,13 +541,7 @@ CMakeFiles/xmllint.dir/shell.c.o:
 
 /usr/include/x86_64-linux-gnu/bits/floatn.h:
 
-config.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
-
-/home/jessie/Documents/libxml2/libxml.h:
-
-/usr/include/x86_64-linux-gnu/bits/endianness.h:
+/home/jessie/Documents/libxml2/config.h:
 
 /home/jessie/Documents/libxml2/include/libxml/HTMLparser.h:
 
@@ -568,6 +562,12 @@ config.h:
 /usr/lib/x86_64-linux-gnu/libc_nonshared.a:
 
 /usr/include/x86_64-linux-gnu/bits/unistd_ext.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
+
+/home/jessie/Documents/libxml2/libxml.h:
+
+/usr/include/x86_64-linux-gnu/bits/endianness.h:
 
 /usr/include/alloca.h:
 

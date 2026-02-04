@@ -18,6 +18,7 @@
 
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include <libxml/xmlmemory.h>
@@ -56,6 +57,104 @@
 /*
  * Various global defaults for parsing
  */
+
+static const char *
+xmlResourceTypeToString(xmlResourceType type) {
+    switch (type) {
+        case XML_RESOURCE_MAIN_DOCUMENT:
+            return("main-document");
+        case XML_RESOURCE_DTD:
+            return("dtd");
+        case XML_RESOURCE_GENERAL_ENTITY:
+            return("general-entity");
+        case XML_RESOURCE_PARAMETER_ENTITY:
+            return("parameter-entity");
+        case XML_RESOURCE_XINCLUDE:
+            return("xinclude");
+        case XML_RESOURCE_XINCLUDE_TEXT:
+            return("xinclude-text");
+        case XML_RESOURCE_UNKNOWN:
+        default:
+            return("unknown");
+    }
+}
+
+static void
+xmlResourceFlagsToString(xmlParserInputFlags flags, char *buf, size_t size) {
+    size_t used = 0;
+
+    if (size == 0)
+        return;
+
+    buf[0] = '\0';
+
+    if (flags & XML_INPUT_UNZIP) {
+        used += snprintf(buf + used, size - used, "%sUNZIP",
+                         used ? "|" : "");
+    }
+    if (flags & XML_INPUT_NETWORK) {
+        used += snprintf(buf + used, size - used, "%sNETWORK",
+                         used ? "|" : "");
+    }
+    if (flags & XML_INPUT_USE_SYS_CATALOG) {
+        used += snprintf(buf + used, size - used, "%sSYS_CATALOG",
+                         used ? "|" : "");
+    }
+
+    if (used == 0) {
+        snprintf(buf, size, "NONE");
+    }
+}
+
+static xmlErrorLevel
+xmlErrIOGetLevel(xmlParserCtxt *ctxt, int code) {
+    if (((code == XML_IO_ENOENT) ||
+         (code == XML_IO_UNKNOWN))) {
+        /*
+         * Only report a warning if a file could not be found. This should
+         * only be done for external entities, but the external entity loader
+         * of xsltproc can try multiple paths and assumes that ENOENT doesn't
+         * raise an error and aborts parsing.
+         */
+        if (ctxt->validate == 0)
+            return(XML_ERR_WARNING);
+        return(XML_ERR_ERROR);
+    }
+
+    if (code == XML_IO_NETWORK_ATTEMPT)
+        return(XML_ERR_ERROR);
+
+    return(XML_ERR_FATAL);
+}
+
+static void
+xmlCtxtErrIOResource(xmlParserCtxt *ctxt, int code, const char *uri,
+                     xmlResourceType type, xmlParserInputFlags flags,
+                     const char *reason) {
+    const char *errstr;
+    const char *typeStr;
+    char flagsBuf[64];
+    xmlErrorLevel level;
+
+    if (ctxt == NULL)
+        return;
+
+    errstr = xmlErrString(code);
+    level = xmlErrIOGetLevel(ctxt, code);
+    typeStr = xmlResourceTypeToString(type);
+    xmlResourceFlagsToString(flags, flagsBuf, sizeof(flagsBuf));
+
+    if (reason == NULL)
+        reason = "resource error";
+    if (uri == NULL)
+        uri = "";
+
+    xmlCtxtErr(ctxt, NULL, XML_FROM_IO, code, level,
+               (const xmlChar *) uri, (const xmlChar *) typeStr,
+               (const xmlChar *) reason, 0,
+               "%s for \"%s\": %s (type=%s, flags=%s)\n",
+               reason, uri, errstr, typeStr, flagsBuf);
+}
 
 /**
  * check the compiled lib version against the include one.
@@ -219,23 +318,7 @@ xmlCtxtErrIO(xmlParserCtxt *ctxt, int code, const char *uri)
     if (ctxt == NULL)
         return;
 
-    if (((code == XML_IO_ENOENT) ||
-         (code == XML_IO_UNKNOWN))) {
-        /*
-         * Only report a warning if a file could not be found. This should
-         * only be done for external entities, but the external entity loader
-         * of xsltproc can try multiple paths and assumes that ENOENT doesn't
-         * raise an error and aborts parsing.
-         */
-        if (ctxt->validate == 0)
-            level = XML_ERR_WARNING;
-        else
-            level = XML_ERR_ERROR;
-    } else if (code == XML_IO_NETWORK_ATTEMPT) {
-        level = XML_ERR_ERROR;
-    } else {
-        level = XML_ERR_FATAL;
-    }
+    level = xmlErrIOGetLevel(ctxt, code);
 
     errstr = xmlErrString(code);
 
@@ -2695,7 +2778,8 @@ xmlLoadResource(xmlParserCtxt *ctxt, const char *url, const char *publicId,
 
         if ((ctxt->options & XML_PARSE_REQUIRE_LOADER) &&
             (ctxt->resourceLoader == NULL)) {
-            xmlCtxtErrIO(ctxt, XML_IO_EACCES, url);
+            xmlCtxtErrIOResource(ctxt, XML_IO_EACCES, url, type, flags,
+                                 "resource loader required");
             return(NULL);
         }
     }
@@ -2716,7 +2800,8 @@ xmlLoadResource(xmlParserCtxt *ctxt, const char *url, const char *publicId,
 
             code = policy(userDataPolicy, url, publicId, type, flags);
             if (code != XML_ERR_OK) {
-                xmlCtxtErrIO(ctxt, code, url);
+                xmlCtxtErrIOResource(ctxt, code, url, type, flags,
+                                     "resource policy denied");
                 if (resource != NULL)
                     xmlFree(resource);
                 return(NULL);
@@ -2730,7 +2815,8 @@ xmlLoadResource(xmlParserCtxt *ctxt, const char *url, const char *publicId,
         code = ctxt->resourceLoader(userData, url, publicId, type,
                                     flags, &ret);
         if (code != XML_ERR_OK) {
-            xmlCtxtErrIO(ctxt, code, url);
+            xmlCtxtErrIOResource(ctxt, code, url, type, flags,
+                                 "resource loader failed");
             ret = NULL;
         }
         if (resource != NULL)
@@ -2742,7 +2828,8 @@ xmlLoadResource(xmlParserCtxt *ctxt, const char *url, const char *publicId,
         void *userDataPolicy = policyCtxt ? policyCtxt : ctxt;
         int code = policy(userDataPolicy, url, publicId, type, flags);
         if (code != XML_ERR_OK) {
-            xmlCtxtErrIO(ctxt, code, url);
+            xmlCtxtErrIOResource(ctxt, code, url, type, flags,
+                                 "resource policy denied");
             return(NULL);
         }
     }
@@ -2941,6 +3028,11 @@ xmlInitSAXParserCtxt(xmlParserCtxtPtr ctxt, const xmlSAXHandler *sax,
     }
     if (xmlGetWarningsDefaultValue == 0)
         ctxt->options |= XML_PARSE_NOWARNING;
+#ifdef LIBXML2_SECURE_DEFAULTS
+    ctxt->options |= XML_PARSE_NO_XXE |
+                     XML_PARSE_NONET |
+                     XML_PARSE_REQUIRE_LOADER;
+#endif
 
     ctxt->vctxt.flags = XML_VCTXT_USE_PCTXT;
     ctxt->vctxt.userData = ctxt;

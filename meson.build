@@ -258,6 +258,9 @@ endforeach
 config_h = configuration_data()
 config_h.set_quoted('XML_SYSCONFDIR',
                     get_option('prefix') / get_option('sysconfdir'))
+if get_option('secure-defaults')
+    config_h.set10('LIBXML2_SECURE_DEFAULTS', true)
+endif
 
 # header files
 xml_check_headers = [

@@ -73,6 +73,37 @@ xmlCtxtSetOptions(ctxt, XML_PARSE_REQUIRE_LOADER |
 resource loader is installed. The policy callback can approve or deny
 loads before the loader is invoked.
 
+## Error Reporting
+
+For richer diagnostics, install a structured error handler and capture
+`xmlError` details:
+
+```c
+static void
+myStructuredError(void *ctx, xmlErrorPtr err) {
+    (void)ctx;
+    if (err == NULL)
+        return;
+    fprintf(stderr,
+            "libxml2 error domain=%d code=%d level=%d file=%s line=%d col=%d\n"
+            "message=%s\n"
+            "str1=%s str2=%s str3=%s\n",
+            err->domain, err->code, err->level,
+            err->file ? err->file : "(none)",
+            err->line, err->int2,
+            err->message ? err->message : "(none)",
+            err->str1 ? err->str1 : "(none)",
+            err->str2 ? err->str2 : "(none)",
+            err->str3 ? err->str3 : "(none)");
+}
+
+xmlSetStructuredErrorFunc(NULL, myStructuredError);
+```
+
+Resource loader/policy failures include extra context in `str1` (URI),
+`str2` (resource type), and `str3` (reason). The message also includes
+flags like `UNZIP` or `NETWORK`.
+
 ## Build instructions
 
 libxml2 can be built with GNU Autotools, CMake or meson.
@@ -133,6 +164,12 @@ Other options:
     --prefix=DIR            set installation prefix
     --with-minimum          build a minimally sized library (off)
     --with-legacy           maximum ABI compatibility (off)
+    --with-secure-defaults  enable secure default parser options (off)
+
+Secure defaults only affect legacy APIs without explicit options.
+Callers that pass options (for example to `xmlReadMemory`) are unchanged.
+When enabled, the legacy defaults add `XML_PARSE_NO_XXE`,
+`XML_PARSE_NONET`, and `XML_PARSE_REQUIRE_LOADER`.
 
 Note that by default, no optimization options are used. You have to
 enable them manually, for example with:
@@ -170,6 +207,7 @@ Common CMake options include:
     -D CMAKE_INSTALL_PREFIX=/usr/local  # specify the install path
     -D LIBXML2_WITH_ICONV=OFF           # disable iconv
     -D LIBXML2_WITH_ZLIB=ON             # enable zlib
+    -D LIBXML2_WITH_SECURE_DEFAULTS=ON  # enable secure default parser options
 
 You can also open the libxml source directory with its CMakeLists.txt
 directly in various IDEs such as CLion, QtCreator, or Visual Studio.
@@ -189,6 +227,7 @@ See the `meson_options.txt` file for options. For example:
     -Dhistory=enabled
     -Dschemas=disabled
     -Dzlib=enabled
+    -Dsecure-defaults=true
 
 ## Testing
 

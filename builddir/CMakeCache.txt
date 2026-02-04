@@ -372,6 +372,9 @@ LIBXML2_WITH_SCHEMAS:BOOL=ON
 //Add Schematron support
 LIBXML2_WITH_SCHEMATRON:BOOL=OFF
 
+//Enable secure default parser options
+LIBXML2_WITH_SECURE_DEFAULTS:BOOL=OFF
+
 //Build tests
 LIBXML2_WITH_TESTS:BOOL=ON
 

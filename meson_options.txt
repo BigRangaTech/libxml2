@@ -174,3 +174,9 @@ option('minimum',
   value: false,
   description: 'build a minimally sized library'
 )
+
+option('secure-defaults',
+  type: 'boolean',
+  value: false,
+  description: 'enable secure default parser options'
+)

@@ -131,6 +131,8 @@ AC_ARG_WITH(minimum,
 [  --with-minimum          build a minimally sized library (off)])
 AC_ARG_WITH(legacy,
 [  --with-legacy           maximum ABI compatibility (off)])
+AC_ARG_WITH(secure-defaults,
+[  --with-secure-defaults  enable secure default parser options (off)])
 
 AC_ARG_WITH(tls,
 [  --with-tls              thread-local storage (off)])
@@ -145,6 +147,14 @@ if test "$with_legacy" = "yes"; then
     if test "$with_zlib" = ""; then
         with_zlib=yes
     fi
+fi
+
+dnl
+dnl Secure defaults (opt-in)
+dnl
+if test "$with_secure_defaults" = "yes"; then
+    AC_DEFINE([LIBXML2_SECURE_DEFAULTS], [1],
+              [Define to 1 to enable secure default parser options])
 fi
 
 dnl

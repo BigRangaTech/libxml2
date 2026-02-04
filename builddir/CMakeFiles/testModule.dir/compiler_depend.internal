@@ -3,8 +3,8 @@
 
 CMakeFiles/testModule.dir/testModule.c.o
  /home/jessie/Documents/libxml2/testModule.c
- /home/jessie/Documents/libxml2/builddir/config.h
  /home/jessie/Documents/libxml2/builddir/libxml/xmlversion.h
+ /home/jessie/Documents/libxml2/config.h
  /home/jessie/Documents/libxml2/include/libxml/xmlexports.h
  /home/jessie/Documents/libxml2/include/libxml/xmlmemory.h
  /home/jessie/Documents/libxml2/include/libxml/xmlmodule.h

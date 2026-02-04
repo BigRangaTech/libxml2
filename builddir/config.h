@@ -28,6 +28,9 @@
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
 
+/* Define to 1 to enable secure default parser options */
+#define LIBXML2_SECURE_DEFAULTS 0
+
 /* System configuration directory (/etc) */
 #define XML_SYSCONFDIR "/usr/local/etc"
 

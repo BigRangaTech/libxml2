@@ -63,8 +63,8 @@ CMakeFiles/xmllint.dir/lintmain.c.o
 
 CMakeFiles/xmllint.dir/shell.c.o
  /home/jessie/Documents/libxml2/shell.c
- /home/jessie/Documents/libxml2/builddir/config.h
  /home/jessie/Documents/libxml2/builddir/libxml/xmlversion.h
+ /home/jessie/Documents/libxml2/config.h
  /home/jessie/Documents/libxml2/include/libxml/HTMLparser.h
  /home/jessie/Documents/libxml2/include/libxml/HTMLtree.h
  /home/jessie/Documents/libxml2/include/libxml/SAX2.h
@@ -184,8 +184,8 @@ CMakeFiles/xmllint.dir/shell.c.o
 
 CMakeFiles/xmllint.dir/xmllint.c.o
  /home/jessie/Documents/libxml2/xmllint.c
- /home/jessie/Documents/libxml2/builddir/config.h
  /home/jessie/Documents/libxml2/builddir/libxml/xmlversion.h
+ /home/jessie/Documents/libxml2/config.h
  /home/jessie/Documents/libxml2/include/libxml/HTMLparser.h
  /home/jessie/Documents/libxml2/include/libxml/HTMLtree.h
  /home/jessie/Documents/libxml2/include/libxml/SAX2.h
