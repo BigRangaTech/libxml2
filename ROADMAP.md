@@ -30,6 +30,8 @@ Completed (Documentation reflects implemented work in this fork):
   (JSON, XML, CBOR, binary frames).
 - Added global defaults for max amplification and dictionary limits.
 - Added `ereader_integration.md` for app-side guidance.
+- Libmobi integration: added `XML_PARSE_NO_XXE | XML_PARSE_COMPACT` for NCX parsing
+  and `HTML_PARSE_COMPACT` for HTML parsing (libmobi fork).
 
 Documentation Status:
 - `README.md` covers secure-defaults build options and testing commands.
@@ -41,6 +43,14 @@ Documentation Status:
 - `release_process.md` defines release steps for this fork.
 - `diagnostics_quickstart.md` provides structured error usage examples.
 - `troubleshooting.md` documents common parse failures and fixes.
+
+Libmobi Integration Status (2026-02-05):
+- Build: libmobi can use this fork via `./configure --with-libxml2=libxml2` or
+  CMake `add_subdirectory(libxml2)` when present.
+- Parsing flags in libmobi:
+  - HTML: `HTML_PARSE_NONET` + `HTML_PARSE_COMPACT`.
+  - XML (NCX): `XML_PARSE_NO_XXE | XML_PARSE_COMPACT`.
+- Test signal (libmobi): `make test` PASS 11, XFAIL 1 (sample-invalid-indx.fail).
 
 ## Phase 0: Baseline & Inventory
 - Confirm libmobi usage paths (which libxml2 APIs, options, and parsing modes it uses).
@@ -61,8 +71,8 @@ Documentation Status:
 
 ## Phase 1: Security Hardening (Highest Priority)
 - Enforce safe defaults in app integration: `XML_PARSE_NO_XXE | XML_PARSE_NONET`, avoid `XML_PARSE_NOENT` for untrusted content.
-- App-side: add `XML_PARSE_NO_XXE` to libmobi `xmlReadMemory` calls in `src/parse_rawml.c` (NCX parsing).
-- App-side: confirm HTML parsing paths use `HTML_PARSE_NONET` (already set) and avoid any entity expansion.
+- App-side: add `XML_PARSE_NO_XXE` to libmobi `xmlReadMemory` calls in `src/parse_rawml.c` (NCX parsing). (done in libmobi fork)
+- App-side: confirm HTML parsing paths use `HTML_PARSE_NONET` (already set) and avoid any entity expansion. (libmobi also adds `HTML_PARSE_COMPACT`)
 - Add DRM-friendly controls: `XML_PARSE_REQUIRE_LOADER` and resource policy hooks.
 - App-side: define an allowlist of URL schemes/paths for resource loading
   (for example `appcache://` and `file:///data/ereader/`).
