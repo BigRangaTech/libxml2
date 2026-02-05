@@ -12,6 +12,21 @@ content, structured error reporting, and reproducible diagnostics.
 - Prevent external entity loading and network access for untrusted ebooks.
 - Provide consistent error telemetry for triage and QA.
 
+## libmobi-Ready Feature Checklist
+These are libxml2 capabilities worth keeping ready so libmobi can adopt them
+later without refactoring.
+
+- Structured error output (JSON/XML) + ring buffer dumps for QA telemetry.
+- Error deduplication to reduce noisy logs on malformed books.
+- Redaction rules for PII in error outputs.
+- Resource policy/loader hooks for DRM-friendly allowlists.
+- Parser limits: amplification and dictionary size caps.
+- Compact parsing flags for lower memory use.
+- Optional xmlReader streaming for large NCX/XML parts.
+- Canonicalization (C14N) support for hashing/integrity workflows.
+- Optional schema/validation paths for QA builds only.
+- Controlled catalog resolution for offline or curated identifiers.
+
 ## Parser Options
 Use explicit parser options for all untrusted content. Prefer additive flags
 and avoid changing libxml2 global defaults unless you fully control all call

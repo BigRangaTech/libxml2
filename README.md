@@ -31,6 +31,7 @@ artifacts:
 - `release_process.md` for the fork release workflow.
 - `diagnostics_quickstart.md` for xmllint diagnostic examples.
 - `troubleshooting.md` for common parsing issues and fixes.
+- `ebook_regression_tests.md` for the minimal e-book corpus test set.
 
 Fork status:
 - This repository is maintained as a standalone fork. Upstream merges are

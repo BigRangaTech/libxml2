@@ -8,11 +8,17 @@ cause, record it in **History** as a failed test, and then re-test after
 fixes. Use the Failed Tests section for full details.
 
 ## Latest
-- 2026-02-05: Autotools check-local + CMake ctest passed after NEWS process note. Reason: documentation/process updates. Duration: check-local n/a; ctest 8.27s.
+- 2026-02-05: Autotools check-local + CMake ctest passed after adding ebook regression test doc and Phase 0 baseline placeholders. Reason: documentation update. Duration: check-local n/a; ctest 8.30s.
 
 ## History
 | Date | Build System | Config | Command | Reason | Duration | Result | Failure Reason | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-02-05 | Autotools | default | `make check-local` | add ebook regression test doc | n/a | PASS* | n/a | XML Conformance ran (5 expected errors). XSTC ran (Sun/MS suites report expected errors). |
+| 2026-02-05 | CMake | default | `ctest --test-dir builddir` | add ebook regression test doc | 8.30s | PASS | n/a | 23/23 tests passed |
+| 2026-02-05 | Autotools | default | `make check-local` | remove vendored libmobi | n/a | PASS* | n/a | XML Conformance ran (5 expected errors). XSTC ran (Sun/MS suites report expected errors). |
+| 2026-02-05 | CMake | default | `ctest --test-dir builddir` | remove vendored libmobi | 8.71s | PASS | n/a | 23/23 tests passed |
+| 2026-02-05 | Autotools | default | `make check-local` | docs: libmobi-ready checklist | n/a | PASS* | n/a | XML Conformance ran (5 expected errors). XSTC ran (Sun/MS suites report expected errors). |
+| 2026-02-05 | CMake | default | `ctest --test-dir builddir` | docs: libmobi-ready checklist | 8.67s | PASS | n/a | 23/23 tests passed |
 | 2026-02-05 | Autotools | default | `make check-local` | NEWS update (process note) | n/a | PASS* | n/a | XML Conformance ran (5 expected errors). XSTC ran (Sun/MS suites report expected errors). |
 | 2026-02-05 | CMake | default | `ctest --test-dir builddir` | NEWS update (process note) | 8.27s | PASS | n/a | 23/23 tests passed |
 | 2026-02-05 | Autotools | default | `make check-local` | SPDX headers + failure tracking fields | n/a | PASS* | n/a | XML Conformance ran (5 expected errors). XSTC ran (Sun/MS suites report expected errors). |

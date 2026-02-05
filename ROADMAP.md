@@ -17,10 +17,7 @@ Current State (2026-02-03):
 - Fork matches upstream master at commit `2cc58340`.
 - Added `/dev/urandom` fallback for RNG seeding on older POSIX systems in `dict.c`.
 - Added xmllint `--no-xxe` switch and documentation in `xmllint.c` and `doc/xmllint.xml`.
-- libmobi uses libxml2 optionally via `USE_LIBXML2` (internal xmlwriter available if disabled).
-- libmobi parse entry point: `src/parse_rawml.c` uses `htmlReadMemory(... HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING | HTML_PARSE_NONET)`.
-- libmobi parse entry point: `src/parse_rawml.c` uses `xmlReadMemory(... XML_PARSE_RECOVER | XML_PARSE_NOERROR | XML_PARSE_NOWARNING | XML_PARSE_NONET)` for NCX.
-- libmobi output use: `src/opf.c` uses `xmlTextWriter*` APIs (writer only).
+- libmobi integration notes are maintained externally (libmobi fork is not vendored here).
 
 ## Progress (2026-02-05)
 Completed (Documentation reflects implemented work in this fork):
@@ -51,6 +48,16 @@ Documentation Status:
 - Capture current build matrix for Linux + Android (NDK versions, libc, CPU arch).
 - Document current parser options used in production (XML_PARSE_* and HTML_PARSE_*).
 - Establish a minimal regression test set (smoke parse, sample ebooks, malformed files).
+- Record a libmobi-ready feature checklist (structured errors, limits, DRM policy,
+  compact parsing, xmlReader, C14N, optional validation, catalogs).
+
+### Baseline Notes (Fill In)
+- Linux build matrix: distro, compiler, libc, CPU arch
+- Android build matrix: NDK version, API levels, ABI list
+- Parser flags in production:
+  - HTML: (record here)
+  - XML: (record here)
+- Regression corpus location: (record local path or repo)
 
 ## Phase 1: Security Hardening (Highest Priority)
 - Enforce safe defaults in app integration: `XML_PARSE_NO_XXE | XML_PARSE_NONET`, avoid `XML_PARSE_NOENT` for untrusted content.

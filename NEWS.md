@@ -32,6 +32,8 @@ on what changed and why it matters.
   distribution terms (MIT notices retained).
 - Process: Added SPDX headers to core documentation and expanded
   `testresults.md` with reason/duration/failure tracking.
+- Repo: Removed vendored libmobi reference copy (kept as external dependency).
+- Docs: Added `ebook_regression_tests.md` and Phase 0 baseline placeholders.
 - Diagnostics: Added per-context error deduplication APIs to suppress repeated
   errors and a corresponding `xmllint --error-dedup` switch.
 - Diagnostics: Extended JSON summaries with per-stage counts and timing data.
