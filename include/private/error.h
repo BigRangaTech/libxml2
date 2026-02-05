@@ -24,6 +24,12 @@ xmlVRaiseError(xmlStructuredErrorFunc schannel, xmlGenericErrorFunc channel,
                const char *str2, const char *str3, int int1, int col,
                const char *msg, va_list ap);
 XML_HIDDEN int
+xmlVUpdateErrorNoCallback(void *ctx, struct _xmlNode *node,
+                          int domain, int code, xmlErrorLevel level,
+                          const char *file, int line, const char *str1,
+                          const char *str2, const char *str3,
+                          int int1, int col, const char *msg, va_list ap);
+XML_HIDDEN int
 xmlRaiseError(xmlStructuredErrorFunc schannel, xmlGenericErrorFunc channel,
               void *data, void *ctx, struct _xmlNode *node,
               int domain, int code, xmlErrorLevel level,

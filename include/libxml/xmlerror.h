@@ -1074,6 +1074,21 @@ XMLPUBFUN int
     xmlErrorToJson		(const xmlError *err,
 				 xmlChar **out,
 				 int *len);
+/**
+ * Convert an xmlError to an XML string.
+ *
+ * The returned string must be freed with xmlFree.
+ *
+ * @since 2.16.0
+ * @param err  error to convert
+ * @param out  output pointer for XML string
+ * @param len  output length in bytes (optional)
+ * @returns 0 on success, -1 on error.
+ */
+XMLPUBFUN int
+    xmlErrorToXml		(const xmlError *err,
+				 xmlChar **out,
+				 int *len);
 
 #ifdef __cplusplus
 }

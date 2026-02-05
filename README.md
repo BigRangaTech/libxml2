@@ -1,3 +1,5 @@
+SPDX-License-Identifier: GPL-2.0-or-later
+
 # libxml2
 
 libxml2 is an XML toolkit implemented in C, originally developed for
@@ -22,10 +24,23 @@ artifacts:
 - `NEWS.md` for fork-specific changes.
 - `security_audit.md` for risk tracking and mitigations.
 - `testresults.md` to record test runs and outcomes.
+- `ereader_integration.md` for app-side integration guidance.
+- `error_output_formats.md` for structured error output formats.
+- `security_defaults.md` for recommended security settings.
+- `security_audit_checklist.md` for periodic security review steps.
+- `release_process.md` for the fork release workflow.
+- `diagnostics_quickstart.md` for xmllint diagnostic examples.
+- `troubleshooting.md` for common parsing issues and fixes.
+
+Fork status:
+- This repository is maintained as a standalone fork. Upstream merges are
+  optional and performed only when they align with the e-reader roadmap.
 
 ## License
 
-This code is released under the MIT License, see the Copyright file.
+Upstream libxml2 code is MIT licensed (see `Copyright`). This fork is
+distributed under GPL-2.0-or-later while retaining all upstream MIT notices.
+See `COPYING` for the GPL text.
 
 ## Security
 
@@ -57,6 +72,10 @@ community.
 
 If you need to enforce DRM-style controls over external resource loading,
 use the resource loader and policy APIs:
+
+For end-to-end integration guidance (parser flags, limits, and telemetry),
+see `ereader_integration.md`.
+For structured error formats and redaction, see `error_output_formats.md`.
 
 ```c
 xmlParserCtxt *ctxt = xmlNewParserCtxt();
@@ -124,6 +143,15 @@ for (int i = 0; i < count; i++) {
 free(errs);
 ```
 
+If you want to reduce repeated error noise, enable error deduplication:
+
+```c
+xmlParserCtxt *ctxt = xmlNewParserCtxt();
+xmlCtxtSetErrorDedup(ctxt, 1); /* report only first occurrence */
+/* ... parse ... */
+xmlCtxtResetErrorDedup(ctxt);
+```
+
 If you need structured telemetry, use `xmlErrorToJson`:
 
 ```c
@@ -132,6 +160,17 @@ int len = 0;
 if (xmlErrorToJson(err, &json, &len) == 0) {
     /* send json */
     xmlFree(json);
+}
+```
+
+You can also generate XML via `xmlErrorToXml`:
+
+```c
+xmlChar *xml = NULL;
+int len = 0;
+if (xmlErrorToXml(err, &xml, &len) == 0) {
+    /* send xml */
+    xmlFree(xml);
 }
 ```
 
@@ -202,6 +241,9 @@ Callers that pass options (for example to `xmlReadMemory`) are unchanged.
 When enabled, the legacy defaults add `XML_PARSE_NO_XXE`,
 `XML_PARSE_NONET`, and `XML_PARSE_REQUIRE_LOADER`.
 
+Recommended security defaults and tuning guidance are documented in
+`security_defaults.md`.
+
 Note that by default, no optimization options are used. You have to
 enable them manually, for example with:
 
@@ -210,6 +252,10 @@ enable them manually, for example with:
 Now you can run the test suite with:
 
     make check
+
+For local testing without external suite downloads, use:
+
+    make check-local
 
 Please report test failures to the bug tracker.
 
@@ -265,8 +311,12 @@ See the `meson_options.txt` file for options. For example:
 The full test suite is run by your build system:
 
 - Autotools: `make check`
+- Autotools (local): `make check-local`
 - CMake: `ctest --test-dir builddir`
 - Meson: `meson test -C builddir`
+
+Meson is optional for this fork. Autotools or CMake are enough to build
+and run the full test suite on Linux and Android.
 
 Additional targeted test executables are built in the tree. Typical runs:
 

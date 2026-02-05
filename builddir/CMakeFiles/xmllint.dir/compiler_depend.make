@@ -234,6 +234,7 @@ CMakeFiles/xmllint.dir/xmllint.c.o: /home/jessie/Documents/libxml2/xmllint.c \
   /usr/include/stdlib.h \
   /usr/include/string.h \
   /usr/include/strings.h \
+  /usr/include/syslog.h \
   /usr/include/unistd.h \
   /usr/include/x86_64-linux-gnu/asm/errno.h \
   /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h \
@@ -284,6 +285,9 @@ CMakeFiles/xmllint.dir/xmllint.c.o: /home/jessie/Documents/libxml2/xmllint.c \
   /usr/include/x86_64-linux-gnu/bits/struct_mutex.h \
   /usr/include/x86_64-linux-gnu/bits/struct_rwlock.h \
   /usr/include/x86_64-linux-gnu/bits/struct_stat.h \
+  /usr/include/x86_64-linux-gnu/bits/syslog-decl.h \
+  /usr/include/x86_64-linux-gnu/bits/syslog-path.h \
+  /usr/include/x86_64-linux-gnu/bits/syslog.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
   /usr/include/x86_64-linux-gnu/bits/time64.h \
   /usr/include/x86_64-linux-gnu/bits/timesize.h \
@@ -320,6 +324,7 @@ CMakeFiles/xmllint.dir/xmllint.c.o: /home/jessie/Documents/libxml2/xmllint.c \
   /usr/include/x86_64-linux-gnu/sys/mman.h \
   /usr/include/x86_64-linux-gnu/sys/select.h \
   /usr/include/x86_64-linux-gnu/sys/stat.h \
+  /usr/include/x86_64-linux-gnu/sys/syslog.h \
   /usr/include/x86_64-linux-gnu/sys/time.h \
   /usr/include/x86_64-linux-gnu/sys/types.h \
   /usr/lib/gcc/x86_64-linux-gnu/15/include/limits.h \
@@ -375,7 +380,15 @@ libxml2.so.16.2.0:
 
 /usr/include/x86_64-linux-gnu/sys/time.h:
 
+/usr/include/x86_64-linux-gnu/sys/syslog.h:
+
 /usr/include/x86_64-linux-gnu/sys/mman.h:
+
+/usr/include/x86_64-linux-gnu/bits/syslog.h:
+
+/usr/include/x86_64-linux-gnu/bits/syslog-path.h:
+
+/usr/include/x86_64-linux-gnu/bits/syslog-decl.h:
 
 /usr/include/x86_64-linux-gnu/bits/stat.h:
 
@@ -408,6 +421,8 @@ libxml2.so.16.2.0:
 /usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
 
 /usr/include/x86_64-linux-gnu/bits/timesize.h:
+
+/usr/include/syslog.h:
 
 /usr/include/x86_64-linux-gnu/bits/getopt_core.h:
 

@@ -2049,6 +2049,36 @@ XMLPUBFUN int
 		xmlCtxtGetErrorRing	(xmlParserCtxt *ctxt,
 					 xmlError *errors,
 					 int max);
+/**
+ * Configure per-context error deduplication.
+ *
+ * If limit is 0, deduplication is disabled.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @param limit  maximum number of repeated errors to report
+ * @returns 0 on success, -1 on error.
+ */
+XMLPUBFUN int
+		xmlCtxtSetErrorDedup	(xmlParserCtxt *ctxt,
+					 int limit);
+/**
+ * Get the configured error deduplication limit.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @returns deduplication limit or 0 if disabled.
+ */
+XMLPUBFUN int
+		xmlCtxtGetErrorDedup	(xmlParserCtxt *ctxt);
+/**
+ * Reset per-context error deduplication counters.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ */
+XMLPUBFUN void
+		xmlCtxtResetErrorDedup	(xmlParserCtxt *ctxt);
 XMLPUBFUN void
 		xmlCtxtSetResourceLoader(xmlParserCtxt *ctxt,
 					 xmlResourceLoader loader,

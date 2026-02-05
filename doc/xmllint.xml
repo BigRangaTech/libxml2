@@ -104,6 +104,26 @@
             <arg choice="plain"><option>--max-ampl <replaceable class="option">INTEGER</replaceable></option></arg>
             <arg choice="plain"><option>--maxmem <replaceable class="option">NBBYTES</replaceable></option></arg>
             <arg choice="plain"><option>--nowarning</option></arg>
+            <arg choice="plain"><option>--error-ring <replaceable class="option">N</replaceable></option></arg>
+            <arg choice="plain"><option>--error-dedup <replaceable class="option">N</replaceable></option></arg>
+            <arg choice="plain"><option>--error-ring-dump</option></arg>
+            <arg choice="plain"><option>--error-ring-dump-file <replaceable class="option">FILE</replaceable></option></arg>
+            <arg choice="plain"><option>--error-ring-dump-cbor-file <replaceable class="option">FILE</replaceable></option></arg>
+            <arg choice="plain"><option>--error-ring-dump-bin-file <replaceable class="option">FILE</replaceable></option></arg>
+            <arg choice="plain"><option>--error-xml</option></arg>
+            <arg choice="plain"><option>--error-xml-file <replaceable class="option">FILE</replaceable></option></arg>
+            <arg choice="plain"><option>--error-json</option></arg>
+            <arg choice="plain"><option>--error-json-file <replaceable class="option">FILE</replaceable></option></arg>
+            <arg choice="plain"><option>--error-json-warn-file <replaceable class="option">FILE</replaceable></option></arg>
+            <arg choice="plain"><option>--error-json-array</option></arg>
+            <arg choice="plain"><option>--error-json-pretty</option></arg>
+            <arg choice="plain"><option>--error-json-limit <replaceable class="option">N</replaceable></option></arg>
+            <arg choice="plain"><option>--error-json-summary</option></arg>
+            <arg choice="plain"><option>--error-json-window <replaceable class="option">N</replaceable></option></arg>
+            <arg choice="plain"><option>--error-json-checksum</option></arg>
+            <arg choice="plain"><option>--error-redact <replaceable class="option">LIST</replaceable></option></arg>
+            <arg choice="plain"><option>--error-syslog</option></arg>
+            <arg choice="plain"><option>--error-syslog-facility <replaceable class="option">NAME</replaceable></option></arg>
             <arg choice="plain"><option>--noblanks</option></arg>
             <arg choice="plain"><option>--nocdata</option></arg>
             <arg choice="plain"><option>--format</option></arg>
@@ -375,6 +395,202 @@
             <term><option>--nowarning</option></term>
             <listitem>
                 <para>Do not emit warnings from the parser and/or validator.</para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-ring <replaceable class="option">N</replaceable></option></term>
+            <listitem>
+                <para>
+                    Keep the last <replaceable>N</replaceable> errors in a per-context ring
+                    buffer for postmortem analysis.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-dedup <replaceable class="option">N</replaceable></option></term>
+            <listitem>
+                <para>
+                    Suppress repeated errors after
+                    <replaceable>N</replaceable> occurrences.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-ring-dump</option></term>
+            <listitem>
+                <para>
+                    Dump the error ring as JSON after each parsed file.
+                    Requires <option>--error-ring</option>.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-ring-dump-file <replaceable class="option">FILE</replaceable></option></term>
+            <listitem>
+                <para>
+                    Write error ring JSON to <replaceable>FILE</replaceable>
+                    instead of stderr. Implies <option>--error-ring-dump</option>.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-ring-dump-cbor-file <replaceable class="option">FILE</replaceable></option></term>
+            <listitem>
+                <para>
+                    Write error ring data as CBOR to <replaceable>FILE</replaceable>.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-ring-dump-bin-file <replaceable class="option">FILE</replaceable></option></term>
+            <listitem>
+                <para>
+                    Write error ring data as binary length-prefixed JSON frames
+                    to <replaceable>FILE</replaceable>. The file begins with
+                    a header: <literal>XERB</literal> plus a 32-bit version.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-xml</option></term>
+            <listitem>
+                <para>
+                    Emit structured errors as XML on stderr (one element per line).
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-xml-file <replaceable class="option">FILE</replaceable></option></term>
+            <listitem>
+                <para>
+                    Write XML errors to <replaceable>FILE</replaceable> instead
+                    of stderr.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json</option></term>
+            <listitem>
+                <para>
+                    Emit structured errors as JSON lines on stderr.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-file <replaceable class="option">FILE</replaceable></option></term>
+            <listitem>
+                <para>
+                    Write JSON error output to <replaceable>FILE</replaceable>
+                    instead of stderr.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-warn-file <replaceable class="option">FILE</replaceable></option></term>
+            <listitem>
+                <para>
+                    Write JSON warnings to <replaceable>FILE</replaceable>
+                    instead of stderr.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-array</option></term>
+            <listitem>
+                <para>
+                    Emit a JSON array per file instead of JSON lines.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-pretty</option></term>
+            <listitem>
+                <para>
+                    Pretty-print JSON output.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-limit <replaceable class="option">N</replaceable></option></term>
+            <listitem>
+                <para>
+                    Limit the number of JSON error objects emitted.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-summary</option></term>
+            <listitem>
+                <para>
+                    Emit a per-file JSON summary with counts by level,
+                    domain, code, and stage, including lightweight stage timing.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-window <replaceable class="option">N</replaceable></option></term>
+            <listitem>
+                <para>
+                    Include up to <replaceable>N</replaceable> bytes of input
+                    context in JSON output.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-json-checksum</option></term>
+            <listitem>
+                <para>
+                    Include a file checksum in JSON output.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-redact <replaceable class="option">LIST</replaceable></option></term>
+            <listitem>
+                <para>
+                    Redact sensitive fields in structured output. Comma-separated
+                    tokens: <literal>file</literal>, <literal>message</literal>,
+                    <literal>str1</literal>, <literal>str2</literal>,
+                    <literal>str3</literal>, <literal>window</literal>,
+                    <literal>all</literal>, <literal>none</literal>.
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-syslog</option></term>
+            <listitem>
+                <para>
+                    Send JSON errors to syslog (POSIX only).
+                </para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+            <term><option>--error-syslog-facility <replaceable class="option">NAME</replaceable></option></term>
+            <listitem>
+                <para>
+                    Select syslog facility (e.g. <literal>user</literal>,
+                    <literal>local0</literal>..<literal>local7</literal>).
+                </para>
             </listitem>
         </varlistentry>
 

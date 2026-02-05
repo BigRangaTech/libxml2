@@ -1,10 +1,10 @@
-Start testing: Feb 04 12:55 AEST
+Start testing: Feb 05 17:45 AEST
 ----------------------------------------------------------
 1/23 Testing: runtest
 1/23 Test: runtest
 Command: "/home/jessie/Documents/libxml2/builddir/runtest" "--out" "/home/jessie/Documents/libxml2/builddir"
 Directory: /home/jessie/Documents/libxml2
-"runtest" start time: Feb 04 12:55 AEST
+"runtest" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 validity error : Too many errors; further errors suppressed (stage=start)
@@ -66,10 +66,10 @@ validity error : Too many errors; further errors suppressed (stage=start)
 ## Automata regression tests
 Total 3903 tests, no errors
 <end of output>
-Test time =   2.57 sec
+Test time =   2.77 sec
 ----------------------------------------------------------
 Test Passed.
-"runtest" end time: Feb 04 12:55 AEST
+"runtest" end time: Feb 05 17:45 AEST
 "runtest" time elapsed: 00:00:02
 ----------------------------------------------------------
 
@@ -77,7 +77,7 @@ Test Passed.
 2/23 Test: runsuite
 Command: "/home/jessie/Documents/libxml2/builddir/runsuite"
 Directory: /home/jessie/Documents/libxml2
-"runsuite" start time: Feb 04 12:55 AEST
+"runsuite" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 ## XML Schemas datatypes test suite from James Clark
@@ -97,10 +97,10 @@ Ran 7165 tests (4686 schemata), 547 errors (0 internals), 0 leaks
 Some errors were expected.
 Total 31981 tests, no errors
 <end of output>
-Test time =   2.82 sec
+Test time =   2.33 sec
 ----------------------------------------------------------
 Test Passed.
-"runsuite" end time: Feb 04 12:55 AEST
+"runsuite" end time: Feb 05 17:45 AEST
 "runsuite" time elapsed: 00:00:02
 ----------------------------------------------------------
 
@@ -108,7 +108,7 @@ Test Passed.
 3/23 Test: runxmlconf
 Command: "/home/jessie/Documents/libxml2/builddir/runxmlconf"
 Directory: /home/jessie/Documents/libxml2
-"runxmlconf" start time: Feb 04 12:55 AEST
+"runxmlconf" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 Test suite: XML 1.0 (2nd edition) W3C Conformance Test Suite, 6 October 2000
@@ -138,10 +138,10 @@ Total 2269 tests, 5 errors, 0 leaks
 See runxmlconf.log for detailed output
 5 errors were expected
 <end of output>
-Test time =   0.17 sec
+Test time =   0.13 sec
 ----------------------------------------------------------
 Test Passed.
-"runxmlconf" end time: Feb 04 12:55 AEST
+"runxmlconf" end time: Feb 05 17:45 AEST
 "runxmlconf" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -149,14 +149,14 @@ Test Passed.
 4/23 Test: testapi
 Command: "/home/jessie/Documents/libxml2/builddir/testapi"
 Directory: /home/jessie/Documents/libxml2/builddir
-"testapi" start time: Feb 04 12:55 AEST
+"testapi" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"testapi" end time: Feb 04 12:55 AEST
+"testapi" end time: Feb 05 17:45 AEST
 "testapi" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -164,14 +164,14 @@ Test Passed.
 5/23 Test: testcatalog
 Command: "/home/jessie/Documents/libxml2/builddir/testcatalog"
 Directory: /home/jessie/Documents/libxml2/builddir
-"testcatalog" start time: Feb 04 12:55 AEST
+"testcatalog" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"testcatalog" end time: Feb 04 12:55 AEST
+"testcatalog" end time: Feb 05 17:45 AEST
 "testcatalog" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -179,17 +179,17 @@ Test Passed.
 6/23 Test: testchar
 Command: "/home/jessie/Documents/libxml2/builddir/testchar"
 Directory: /home/jessie/Documents/libxml2/builddir
-"testchar" start time: Feb 04 12:55 AEST
+"testchar" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 testing char range: 1 2 3 4 done
 testing 1 byte char in document: 1 2 3 4 done
 testing 2 byte char in document: 1 2 3 4 done
 <end of output>
-Test time =   0.48 sec
+Test time =   0.53 sec
 ----------------------------------------------------------
 Test Passed.
-"testchar" end time: Feb 04 12:55 AEST
+"testchar" end time: Feb 05 17:45 AEST
 "testchar" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -197,14 +197,14 @@ Test Passed.
 7/23 Test: testdict
 Command: "/home/jessie/Documents/libxml2/builddir/testdict"
 Directory: /home/jessie/Documents/libxml2/builddir
-"testdict" start time: Feb 04 12:55 AEST
+"testdict" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.62 sec
 ----------------------------------------------------------
 Test Passed.
-"testdict" end time: Feb 04 12:55 AEST
+"testdict" end time: Feb 05 17:45 AEST
 "testdict" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -212,7 +212,7 @@ Test Passed.
 8/23 Test: testparser
 Command: "/home/jessie/Documents/libxml2/builddir/testparser"
 Directory: /home/jessie/Documents/libxml2
-"testparser" start time: Feb 04 12:55 AEST
+"testparser" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 I/O error : resource loader required for "file:///nope.dtd": Permission denied (type=dtd, flags=NETWORK, stage=resource)
@@ -222,10 +222,10 @@ I/O error : resource policy denied for "file:///nope.dtd": Permission denied (ty
 <!DOCTYPE doc SYSTEM "file:///nope.dtd"><doc/>
                                         ^
 <end of output>
-Test time =   0.63 sec
+Test time =   0.64 sec
 ----------------------------------------------------------
 Test Passed.
-"testparser" end time: Feb 04 12:55 AEST
+"testparser" end time: Feb 05 17:45 AEST
 "testparser" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -233,7 +233,7 @@ Test Passed.
 9/23 Test: testrecurse
 Command: "/home/jessie/Documents/libxml2/builddir/testrecurse"
 Directory: /home/jessie/Documents/libxml2
-"testrecurse" start time: Feb 04 12:55 AEST
+"testrecurse" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 ## Parsing recursive test cases
@@ -249,10 +249,10 @@ Output:
 ## Parsing non-recursive huge DTD case
 Total 49 tests, no errors
 <end of output>
-Test time =   0.85 sec
+Test time =   0.83 sec
 ----------------------------------------------------------
 Test Passed.
-"testrecurse" end time: Feb 04 12:55 AEST
+"testrecurse" end time: Feb 05 17:45 AEST
 "testrecurse" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -260,14 +260,14 @@ Test Passed.
 10/23 Test: scripts_base
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmllint" "-DSTDIN=./test/scripts/base.script" "-DXML=./test/scripts/base.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/scripts/base" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/scripts/base.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/scripts/base" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/scripts/base.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"scripts_base" start time: Feb 04 12:55 AEST
+"scripts_base" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
-Test time =   0.03 sec
+Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"scripts_base" end time: Feb 04 12:55 AEST
+"scripts_base" end time: Feb 05 17:45 AEST
 "scripts_base" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -275,14 +275,14 @@ Test Passed.
 11/23 Test: scripts_base2
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmllint" "-DSTDIN=./test/scripts/base2.script" "-DXML=./test/scripts/base2.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/scripts/base2" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/scripts/base2.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/scripts/base2" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/scripts/base2.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"scripts_base2" start time: Feb 04 12:55 AEST
+"scripts_base2" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"scripts_base2" end time: Feb 04 12:55 AEST
+"scripts_base2" end time: Feb 05 17:45 AEST
 "scripts_base2" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -290,14 +290,14 @@ Test Passed.
 12/23 Test: scripts_long_command
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmllint" "-DSTDIN=./test/scripts/long_command.script" "-DXML=./test/scripts/long_command.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/scripts/long_command" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/scripts/long_command.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/scripts/long_command" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/scripts/long_command.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"scripts_long_command" start time: Feb 04 12:55 AEST
+"scripts_long_command" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"scripts_long_command" end time: Feb 04 12:55 AEST
+"scripts_long_command" end time: Feb 05 17:45 AEST
 "scripts_long_command" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -305,14 +305,14 @@ Test Passed.
 13/23 Test: scripts_set1
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmllint" "-DSTDIN=./test/scripts/set1.script" "-DXML=./test/scripts/set1.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/scripts/set1" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/scripts/set1.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/scripts/set1" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/scripts/set1.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"scripts_set1" start time: Feb 04 12:55 AEST
+"scripts_set1" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
-Test time =   0.02 sec
+Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"scripts_set1" end time: Feb 04 12:55 AEST
+"scripts_set1" end time: Feb 05 17:45 AEST
 "scripts_set1" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -320,14 +320,14 @@ Test Passed.
 14/23 Test: scripts_set3
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmllint" "-DSTDIN=./test/scripts/set3.script" "-DXML=./test/scripts/set3.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/scripts/set3" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/scripts/set3.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/scripts/set3" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/scripts/set3.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"scripts_set3" start time: Feb 04 12:55 AEST
+"scripts_set3" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"scripts_set3" end time: Feb 04 12:55 AEST
+"scripts_set3" end time: Feb 05 17:45 AEST
 "scripts_set3" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -335,14 +335,14 @@ Test Passed.
 15/23 Test: scripts_set4
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmllint" "-DSTDIN=./test/scripts/set4.script" "-DXML=./test/scripts/set4.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/scripts/set4" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/scripts/set4.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/scripts/set4" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/scripts/set4.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"scripts_set4" start time: Feb 04 12:55 AEST
+"scripts_set4" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"scripts_set4" end time: Feb 04 12:55 AEST
+"scripts_set4" end time: Feb 05 17:45 AEST
 "scripts_set4" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -350,14 +350,14 @@ Test Passed.
 16/23 Test: scripts_whereis
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmllint" "-DSTDIN=./test/scripts/whereis.script" "-DXML=./test/scripts/whereis.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/scripts/whereis" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/scripts/whereis.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/scripts/whereis" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/scripts/whereis.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"scripts_whereis" start time: Feb 04 12:55 AEST
+"scripts_whereis" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"scripts_whereis" end time: Feb 04 12:55 AEST
+"scripts_whereis" end time: Feb 05 17:45 AEST
 "scripts_whereis" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -365,14 +365,14 @@ Test Passed.
 17/23 Test: catalogs_catal
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmlcatalog" "-DSTDIN=./test/catalogs/catal.script" "-DXML=./test/catalogs/catal.sgml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/catalogs/catal" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/catalogs/catal.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/catalogs/catal" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/catalogs/catal.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"catalogs_catal" start time: Feb 04 12:55 AEST
+"catalogs_catal" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"catalogs_catal" end time: Feb 04 12:55 AEST
+"catalogs_catal" end time: Feb 05 17:45 AEST
 "catalogs_catal" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -380,14 +380,14 @@ Test Passed.
 18/23 Test: catalogs_docbook
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmlcatalog" "-DSTDIN=./test/catalogs/docbook.script" "-DXML=./test/catalogs/docbook.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/catalogs/docbook" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/catalogs/docbook.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/catalogs/docbook" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/catalogs/docbook.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"catalogs_docbook" start time: Feb 04 12:55 AEST
+"catalogs_docbook" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
-Test time =   0.02 sec
+Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"catalogs_docbook" end time: Feb 04 12:55 AEST
+"catalogs_docbook" end time: Feb 05 17:45 AEST
 "catalogs_docbook" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -395,14 +395,14 @@ Test Passed.
 19/23 Test: catalogs_recursive
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmlcatalog" "-DSTDIN=./test/catalogs/recursive.script" "-DXML=./test/catalogs/recursive.sgml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/catalogs/recursive" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/catalogs/recursive.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/catalogs/recursive" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/catalogs/recursive.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"catalogs_recursive" start time: Feb 04 12:55 AEST
+"catalogs_recursive" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"catalogs_recursive" end time: Feb 04 12:55 AEST
+"catalogs_recursive" end time: Feb 05 17:45 AEST
 "catalogs_recursive" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -410,14 +410,14 @@ Test Passed.
 20/23 Test: catalogs_registry
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmlcatalog" "-DSTDIN=./test/catalogs/registry.script" "-DXML=./test/catalogs/registry.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/catalogs/registry" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/catalogs/registry.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/catalogs/registry" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/catalogs/registry.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"catalogs_registry" start time: Feb 04 12:55 AEST
+"catalogs_registry" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
-Test time =   0.02 sec
+Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"catalogs_registry" end time: Feb 04 12:55 AEST
+"catalogs_registry" end time: Feb 05 17:45 AEST
 "catalogs_registry" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -425,14 +425,14 @@ Test Passed.
 21/23 Test: catalogs_whites
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmlcatalog" "-DSTDIN=./test/catalogs/whites.script" "-DXML=./test/catalogs/whites.sgml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/catalogs/whites" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/catalogs/whites.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/catalogs/whites" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/catalogs/whites.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"catalogs_whites" start time: Feb 04 12:55 AEST
+"catalogs_whites" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
-Test time =   0.03 sec
+Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"catalogs_whites" end time: Feb 04 12:55 AEST
+"catalogs_whites" end time: Feb 05 17:45 AEST
 "catalogs_whites" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -440,14 +440,14 @@ Test Passed.
 22/23 Test: catalogs_whitex
 Command: "/usr/bin/cmake" "-DPROG=/home/jessie/Documents/libxml2/builddir/xmlcatalog" "-DSTDIN=./test/catalogs/whitex.script" "-DXML=./test/catalogs/whitex.xml" "-DSTDOUT=/home/jessie/Documents/libxml2/builddir/result/catalogs/whitex" "-DSTDERR=/home/jessie/Documents/libxml2/builddir/result/catalogs/whitex.err" "-DEXPECTED_STDOUT=/home/jessie/Documents/libxml2/result/catalogs/whitex" "-DEXPECTED_STDERR=/home/jessie/Documents/libxml2/result/catalogs/whitex.err" "-DWORKDIR=/home/jessie/Documents/libxml2" "-P" "/home/jessie/Documents/libxml2/run_and_diff.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"catalogs_whitex" start time: Feb 04 12:55 AEST
+"catalogs_whitex" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"catalogs_whitex" end time: Feb 04 12:55 AEST
+"catalogs_whitex" end time: Feb 05 17:45 AEST
 "catalogs_whitex" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -455,15 +455,15 @@ Test Passed.
 23/23 Test: catalog_add_del
 Command: "/usr/bin/cmake" "-DXMLCAT=/home/jessie/Documents/libxml2/builddir/xmlcatalog" "-DEXPECTED_FULL=/home/jessie/Documents/libxml2/result/catalogs/mycatalog.full" "-DEXPECTED_EMPTY=/home/jessie/Documents/libxml2/result/catalogs/mycatalog.empty" "-P" "/home/jessie/Documents/libxml2/test_xmlcatalog_add_del.cmake"
 Directory: /home/jessie/Documents/libxml2/builddir
-"catalog_add_del" start time: Feb 04 12:55 AEST
+"catalog_add_del" start time: Feb 05 17:45 AEST
 Output:
 ----------------------------------------------------------
 <end of output>
-Test time =   0.06 sec
+Test time =   0.05 sec
 ----------------------------------------------------------
 Test Passed.
-"catalog_add_del" end time: Feb 04 12:55 AEST
+"catalog_add_del" end time: Feb 05 17:45 AEST
 "catalog_add_del" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Feb 04 12:55 AEST
+End testing: Feb 05 17:45 AEST

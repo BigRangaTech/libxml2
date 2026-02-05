@@ -54,10 +54,16 @@
 #endif
 
 #define XML_MAX_ERRORS 100
+#define XML_ERROR_DEDUP_DEFAULT_SIZE 64
 
 /*
  * Various global defaults for parsing
  */
+
+typedef struct _xmlErrorDedupEntry {
+    unsigned long long fingerprint;
+    unsigned int count;
+} xmlErrorDedupEntry;
 
 typedef struct _xmlErrorRingEntry {
     xmlParserCtxt *ctxt;
@@ -65,6 +71,11 @@ typedef struct _xmlErrorRingEntry {
     int size;
     int count;
     int next;
+    int dedupLimit;
+    xmlErrorDedupEntry *dedup;
+    int dedupSize;
+    int dedupCount;
+    int dedupNext;
     struct _xmlErrorRingEntry *nextEntry;
 } xmlErrorRingEntry;
 
@@ -106,18 +117,31 @@ xmlErrorRingLookup(xmlParserCtxt *ctxt) {
 }
 
 static void
+xmlErrorDedupReset(xmlErrorRingEntry *entry) {
+    if ((entry == NULL) || (entry->dedup == NULL))
+        return;
+
+    memset(entry->dedup, 0, sizeof(*entry->dedup) * entry->dedupSize);
+    entry->dedupCount = 0;
+    entry->dedupNext = 0;
+}
+
+static void
 xmlErrorRingClear(xmlErrorRingEntry *entry) {
     int i;
 
-    if ((entry == NULL) || (entry->errors == NULL))
+    if (entry == NULL)
         return;
 
-    for (i = 0; i < entry->size; i++) {
-        if (entry->errors[i].code != XML_ERR_OK)
-            xmlResetError(&entry->errors[i]);
+    if (entry->errors != NULL) {
+        for (i = 0; i < entry->size; i++) {
+            if (entry->errors[i].code != XML_ERR_OK)
+                xmlResetError(&entry->errors[i]);
+        }
+        entry->count = 0;
+        entry->next = 0;
     }
-    entry->count = 0;
-    entry->next = 0;
+    xmlErrorDedupReset(entry);
 }
 
 static void
@@ -128,6 +152,10 @@ xmlErrorRingFreeEntry(xmlErrorRingEntry *entry) {
     if (entry->errors != NULL) {
         xmlErrorRingClear(entry);
         xmlFree(entry->errors);
+    }
+    if (entry->dedup != NULL) {
+        xmlFree(entry->dedup);
+        entry->dedup = NULL;
     }
     xmlFree(entry);
 }
@@ -162,6 +190,94 @@ xmlCtxtStoreErrorRing(xmlParserCtxt *ctxt) {
         entry->count += 1;
 
     xmlErrorRingUnlock();
+}
+
+static unsigned long long
+xmlErrorFingerprintAddInt(unsigned long long hash, int value) {
+    int i;
+
+    for (i = 0; i < (int) sizeof(value); i++) {
+        hash ^= (unsigned char) ((value >> (i * 8)) & 0xFF);
+        hash *= 1099511628211ULL;
+    }
+
+    return hash;
+}
+
+static unsigned long long
+xmlErrorFingerprintAddString(unsigned long long hash, const char *str) {
+    const unsigned char *cur;
+
+    if (str == NULL)
+        return hash;
+
+    for (cur = (const unsigned char *) str; *cur != '\0'; cur++) {
+        hash ^= *cur;
+        hash *= 1099511628211ULL;
+    }
+
+    return hash;
+}
+
+static unsigned long long
+xmlErrorFingerprint(xmlErrorDomain domain, xmlParserErrors code,
+                    xmlErrorLevel level, const xmlChar *str1,
+                    const xmlChar *str2, const xmlChar *str3,
+                    const char *msg) {
+    unsigned long long hash = 1469598103934665603ULL;
+
+    hash = xmlErrorFingerprintAddInt(hash, (int) domain);
+    hash = xmlErrorFingerprintAddInt(hash, (int) code);
+    hash = xmlErrorFingerprintAddInt(hash, (int) level);
+    hash = xmlErrorFingerprintAddString(hash, (const char *) str1);
+    hash = xmlErrorFingerprintAddString(hash, (const char *) str2);
+    hash = xmlErrorFingerprintAddString(hash, (const char *) str3);
+    hash = xmlErrorFingerprintAddString(hash, msg);
+
+    return hash;
+}
+
+static int
+xmlCtxtErrorDedupShouldSuppress(xmlParserCtxt *ctxt,
+                                unsigned long long fingerprint) {
+    xmlErrorRingEntry *entry;
+    int suppress = 0;
+    int i;
+
+    if (ctxt == NULL)
+        return 0;
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingLookup(ctxt);
+    if ((entry == NULL) || (entry->dedupLimit <= 0) ||
+        (entry->dedup == NULL) || (entry->dedupSize <= 0)) {
+        xmlErrorRingUnlock();
+        return 0;
+    }
+
+    for (i = 0; i < entry->dedupCount; i++) {
+        if (entry->dedup[i].fingerprint == fingerprint) {
+            entry->dedup[i].count += 1;
+            if (entry->dedup[i].count > (unsigned) entry->dedupLimit)
+                suppress = 1;
+            xmlErrorRingUnlock();
+            return suppress;
+        }
+    }
+
+    if (entry->dedupCount < entry->dedupSize) {
+        i = entry->dedupCount;
+        entry->dedupCount += 1;
+    } else {
+        i = entry->dedupNext;
+        entry->dedupNext = (entry->dedupNext + 1) % entry->dedupSize;
+    }
+
+    entry->dedup[i].fingerprint = fingerprint;
+    entry->dedup[i].count = 1;
+
+    xmlErrorRingUnlock();
+    return 0;
 }
 
 static const char *
@@ -448,11 +564,22 @@ xmlCtxtSetErrorRingSize(xmlParserCtxt *ctxt, int size) {
 
     if (size == 0) {
         if (entry != NULL) {
-            if (prev != NULL)
-                prev->nextEntry = entry->nextEntry;
-            else
-                xmlErrorRingList = entry->nextEntry;
-            xmlErrorRingFreeEntry(entry);
+            if (entry->errors != NULL) {
+                xmlErrorRingClear(entry);
+                xmlFree(entry->errors);
+                entry->errors = NULL;
+            }
+            entry->size = 0;
+            entry->count = 0;
+            entry->next = 0;
+
+            if (entry->dedupLimit <= 0) {
+                if (prev != NULL)
+                    prev->nextEntry = entry->nextEntry;
+                else
+                    xmlErrorRingList = entry->nextEntry;
+                xmlErrorRingFreeEntry(entry);
+            }
         }
         xmlErrorRingUnlock();
         return(0);
@@ -588,6 +715,136 @@ xmlCtxtGetErrorRing(xmlParserCtxt *ctxt, xmlError *errors, int max) {
 
     xmlErrorRingUnlock();
     return(count);
+}
+
+/**
+ * Set the per-context error deduplication limit.
+ *
+ * If limit is 0, error deduplication is disabled.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @param limit  maximum number of repeated errors to report
+ * @returns 0 on success, -1 on error.
+ */
+int
+xmlCtxtSetErrorDedup(xmlParserCtxt *ctxt, int limit) {
+    xmlErrorRingEntry *entry;
+    xmlErrorRingEntry *prev;
+    int newEntry = 0;
+
+    if ((ctxt == NULL) || (limit < 0))
+        return(-1);
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingList;
+    prev = NULL;
+    while (entry != NULL) {
+        if (entry->ctxt == ctxt)
+            break;
+        prev = entry;
+        entry = entry->nextEntry;
+    }
+
+    if (limit == 0) {
+        if (entry != NULL) {
+            if (entry->dedup != NULL) {
+                xmlFree(entry->dedup);
+                entry->dedup = NULL;
+            }
+            entry->dedupLimit = 0;
+            entry->dedupSize = 0;
+            entry->dedupCount = 0;
+            entry->dedupNext = 0;
+
+            if (entry->size == 0) {
+                if (prev != NULL)
+                    prev->nextEntry = entry->nextEntry;
+                else
+                    xmlErrorRingList = entry->nextEntry;
+                xmlErrorRingFreeEntry(entry);
+            }
+        }
+        xmlErrorRingUnlock();
+        return(0);
+    }
+
+    if (entry == NULL) {
+        entry = xmlMalloc(sizeof(*entry));
+        if (entry == NULL) {
+            xmlErrorRingUnlock();
+            return(-1);
+        }
+        memset(entry, 0, sizeof(*entry));
+        entry->ctxt = ctxt;
+        entry->nextEntry = xmlErrorRingList;
+        xmlErrorRingList = entry;
+        newEntry = 1;
+    }
+
+    if ((entry->dedup == NULL) || (entry->dedupSize <= 0)) {
+        entry->dedup = xmlMalloc(sizeof(*entry->dedup) *
+                                 XML_ERROR_DEDUP_DEFAULT_SIZE);
+        if (entry->dedup == NULL) {
+            if (newEntry) {
+                xmlErrorRingList = entry->nextEntry;
+                xmlErrorRingFreeEntry(entry);
+            }
+            xmlErrorRingUnlock();
+            return(-1);
+        }
+        entry->dedupSize = XML_ERROR_DEDUP_DEFAULT_SIZE;
+    }
+
+    entry->dedupLimit = limit;
+    xmlErrorDedupReset(entry);
+
+    xmlErrorRingUnlock();
+    return(0);
+}
+
+/**
+ * Get the configured error deduplication limit.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ * @returns deduplication limit or 0 if disabled.
+ */
+int
+xmlCtxtGetErrorDedup(xmlParserCtxt *ctxt) {
+    xmlErrorRingEntry *entry;
+    int limit = 0;
+
+    if (ctxt == NULL)
+        return(0);
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingLookup(ctxt);
+    if (entry != NULL)
+        limit = entry->dedupLimit;
+    xmlErrorRingUnlock();
+
+    return(limit);
+}
+
+/**
+ * Reset the per-context error deduplication counters.
+ *
+ * @since 2.16.0
+ * @param ctxt  parser context
+ */
+void
+xmlCtxtResetErrorDedup(xmlParserCtxt *ctxt) {
+    xmlErrorRingEntry *entry;
+
+    if (ctxt == NULL)
+        return;
+
+    xmlErrorRingLock();
+    entry = xmlErrorRingLookup(ctxt);
+    if (entry != NULL)
+        xmlErrorDedupReset(entry);
+    xmlErrorRingUnlock();
 }
 
 /**
@@ -813,6 +1070,8 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
     int col = 0;
     int res;
     const char *stage = NULL;
+    unsigned long long fingerprint = 0;
+    int suppress = 0;
 
     if (code == XML_ERR_NO_MEMORY) {
         xmlCtxtErrMemory(ctxt);
@@ -841,15 +1100,33 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
     if ((str3 == NULL) && (stage != NULL))
         str3 = (const xmlChar *) stage;
 
-    if (level == XML_ERR_WARNING) {
-        if (ctxt->nbWarnings >= XML_MAX_ERRORS) {
-            if (ctxt->nbWarnings == XML_MAX_ERRORS) {
-                xmlCtxtReportErrorLimit(ctxt, domain, level, stage, 1);
-                ctxt->nbWarnings += 1;
-            }
-            return;
+    if (ctxt->input != NULL) {
+        xmlParserInputPtr input = ctxt->input;
+
+        if ((input->filename == NULL) &&
+            (ctxt->inputNr > 1)) {
+            input = ctxt->inputTab[ctxt->inputNr - 2];
         }
-        ctxt->nbWarnings += 1;
+        file = input->filename;
+        line = input->line;
+        col = input->col;
+    }
+
+    fingerprint = xmlErrorFingerprint(domain, code, level,
+                                      str1, str2, str3, msg);
+    suppress = xmlCtxtErrorDedupShouldSuppress(ctxt, fingerprint);
+
+    if (level == XML_ERR_WARNING) {
+        if (!suppress) {
+            if (ctxt->nbWarnings >= XML_MAX_ERRORS) {
+                if (ctxt->nbWarnings == XML_MAX_ERRORS) {
+                    xmlCtxtReportErrorLimit(ctxt, domain, level, stage, 1);
+                    ctxt->nbWarnings += 1;
+                }
+                return;
+            }
+            ctxt->nbWarnings += 1;
+        }
     } else {
         /*
          * By long-standing design, the parser isn't completely
@@ -865,7 +1142,8 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
             ctxt->disableSAX = 2; /* really stop parser */
         } else {
             /* Report at least one fatal error. */
-            if (ctxt->nbErrors >= XML_MAX_ERRORS &&
+            if (!suppress &&
+                (ctxt->nbErrors >= XML_MAX_ERRORS) &&
                 (level < XML_ERR_FATAL || ctxt->wellFormed == 0)) {
                 if (ctxt->nbErrors == XML_MAX_ERRORS) {
                     xmlCtxtReportErrorLimit(ctxt, domain, level, stage, 0);
@@ -881,7 +1159,19 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
         if (level == XML_ERR_FATAL)
             ctxt->wellFormed = 0;
         ctxt->errNo = code;
-        ctxt->nbErrors += 1;
+        if (!suppress)
+            ctxt->nbErrors += 1;
+    }
+
+    if (suppress) {
+        res = xmlVUpdateErrorNoCallback(ctxt, node, domain, code, level,
+                                        file, line, (const char *) str1,
+                                        (const char *) str2,
+                                        (const char *) str3, int1, col,
+                                        msg, ap);
+        if (res < 0)
+            xmlCtxtErrMemory(ctxt);
+        return;
     }
 
     if (((ctxt->options & XML_PARSE_NOERROR) == 0) &&
@@ -907,18 +1197,6 @@ xmlCtxtVErr(xmlParserCtxt *ctxt, xmlNode *node, xmlErrorDomain domain,
                 channel = ctxt->sax->error;
             data = ctxt->userData;
         }
-    }
-
-    if (ctxt->input != NULL) {
-        xmlParserInputPtr input = ctxt->input;
-
-        if ((input->filename == NULL) &&
-            (ctxt->inputNr > 1)) {
-            input = ctxt->inputTab[ctxt->inputNr - 2];
-        }
-        file = input->filename;
-        line = input->line;
-        col = input->col;
     }
 
     res = xmlVRaiseError(schannel, channel, data, ctxt, node, domain, code,

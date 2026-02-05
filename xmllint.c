@@ -15,6 +15,9 @@
 #include <errno.h>
 #include <limits.h>
 #include <fcntl.h>
+#ifndef _WIN32
+#include <syslog.h>
+#endif
 
 #ifdef _WIN32
   #include <io.h>
@@ -74,6 +77,8 @@
 #endif
 
 #include "private/lint.h"
+
+#define XMLLINT_JSON_SCHEMA_VERSION 1
 
 #ifndef STDIN_FILENO
   #define STDIN_FILENO 0
@@ -173,6 +178,39 @@ typedef enum {
 } xmllintAppOptions;
 
 typedef struct {
+    int flag;
+    const char *name;
+} xmllintOptName;
+
+typedef struct {
+    int code;
+    unsigned count;
+} xmllintCodeCount;
+
+typedef enum {
+    XMLLINT_REDACT_FILE = (1u << 0),
+    XMLLINT_REDACT_MESSAGE = (1u << 1),
+    XMLLINT_REDACT_STR1 = (1u << 2),
+    XMLLINT_REDACT_STR2 = (1u << 3),
+    XMLLINT_REDACT_STR3 = (1u << 4),
+    XMLLINT_REDACT_WINDOW = (1u << 5)
+} xmllintRedactFlags;
+
+#define XMLLINT_REDACT_ALL (XMLLINT_REDACT_FILE | \
+                            XMLLINT_REDACT_MESSAGE | \
+                            XMLLINT_REDACT_STR1 | \
+                            XMLLINT_REDACT_STR2 | \
+                            XMLLINT_REDACT_STR3 | \
+                            XMLLINT_REDACT_WINDOW)
+
+typedef struct {
+    char *name;
+    unsigned count;
+    long long firstMs;
+    long long lastMs;
+} xmllintStageCount;
+
+typedef struct {
     FILE *errStream;
     xmlParserCtxtPtr ctxt;
     xmlResourceLoader defaultResourceLoader;
@@ -226,6 +264,47 @@ typedef struct {
     int parseOptions;
     unsigned appOptions;
     unsigned maxAmpl;
+    int errorRingSize;
+    int errorDedupLimit;
+    int errorRingDump;
+    int errorXml;
+    int errorJson;
+    int errorJsonArray;
+    int errorJsonPretty;
+    int errorJsonLimit;
+    int errorJsonCount;
+    int errorJsonArrayOpen;
+    int errorJsonArrayCount;
+    const char *errorJsonArrayFile;
+    int errorJsonSummary;
+    int errorJsonWindow;
+    int errorJsonChecksum;
+    int errorSyslog;
+    int errorSyslogFacility;
+    unsigned errorRedactFlags;
+    const char *errorRingDumpFile;
+    const char *errorRingDumpCborFile;
+    const char *errorRingDumpBinFile;
+    const char *errorXmlFile;
+    const char *errorJsonFile;
+    const char *errorJsonWarnFile;
+    FILE *errorRingDumpStream;
+    FILE *errorRingDumpCborStream;
+    FILE *errorRingDumpBinStream;
+    FILE *errorXmlStream;
+    FILE *errorJsonStream;
+    FILE *errorJsonWarnStream;
+    unsigned long long errorChecksum;
+    int checksumValid;
+    unsigned errorDomainCounts[XML_FROM_URI + 1];
+    unsigned errorLevelCounts[4];
+    xmllintCodeCount *errorCodeCounts;
+    int errorCodeCountsSize;
+    int errorCodeCountsCount;
+    xmllintStageCount *errorStageCounts;
+    int errorStageCountsSize;
+    int errorStageCountsCount;
+    xmlTime errorStatsStart;
 
     xmlChar *paths[MAX_PATHS + 1];
     int nbpaths;
@@ -237,6 +316,14 @@ typedef struct {
 static int xmllintMaxmem;
 static int xmllintMaxmemReached;
 static int xmllintOom;
+
+static void
+getTime(xmlTime *time);
+static long long
+xmllintTimeDiffMs(const xmlTime *start, const xmlTime *end);
+static const char *
+xmllintRedactValue(const xmllintState *lint, unsigned flag,
+                   const char *value);
 
 /************************************************************************
  *									*
@@ -326,6 +413,1403 @@ xmllintResourceLoader(void *ctxt, const char *URL,
     }
 
     return(XML_IO_ENOENT);
+}
+
+/************************************************************************
+ *									*
+ *		 	Error reporting helpers				*
+ *									*
+ ************************************************************************/
+
+static void
+xmllintJsonEscape(FILE *out, const char *str) {
+    const unsigned char *cur;
+
+    if (str == NULL) {
+        fputs("null", out);
+        return;
+    }
+
+    fputc('"', out);
+    for (cur = (const unsigned char *) str; *cur != '\0'; cur++) {
+        switch (*cur) {
+            case '\"':
+                fputs("\\\"", out);
+                break;
+            case '\\':
+                fputs("\\\\", out);
+                break;
+            case '\b':
+                fputs("\\b", out);
+                break;
+            case '\f':
+                fputs("\\f", out);
+                break;
+            case '\n':
+                fputs("\\n", out);
+                break;
+            case '\r':
+                fputs("\\r", out);
+                break;
+            case '\t':
+                fputs("\\t", out);
+                break;
+            default:
+                if (*cur < 0x20) {
+                    fprintf(out, "\\u%04x", *cur);
+                } else {
+                    fputc(*cur, out);
+                }
+        }
+    }
+    fputc('"', out);
+}
+
+static int
+xmllintBufAdd(xmlBufferPtr buf, const char *str, int len) {
+    if (len < 0)
+        len = (int) strlen(str);
+    return xmlBufferAdd(buf, BAD_CAST str, len);
+}
+
+static int
+xmllintBufEscape(xmlBufferPtr buf, const char *str) {
+    char tmp[7];
+    const unsigned char *cur;
+
+    if (str == NULL)
+        return xmllintBufAdd(buf, "null", 4);
+
+    if (xmllintBufAdd(buf, "\"", 1) != 0)
+        return -1;
+
+    for (cur = (const unsigned char *) str; *cur != '\0'; cur++) {
+        switch (*cur) {
+            case '\"':
+                if (xmllintBufAdd(buf, "\\\"", 2) != 0)
+                    return -1;
+                break;
+            case '\\':
+                if (xmllintBufAdd(buf, "\\\\", 2) != 0)
+                    return -1;
+                break;
+            case '\b':
+                if (xmllintBufAdd(buf, "\\b", 2) != 0)
+                    return -1;
+                break;
+            case '\f':
+                if (xmllintBufAdd(buf, "\\f", 2) != 0)
+                    return -1;
+                break;
+            case '\n':
+                if (xmllintBufAdd(buf, "\\n", 2) != 0)
+                    return -1;
+                break;
+            case '\r':
+                if (xmllintBufAdd(buf, "\\r", 2) != 0)
+                    return -1;
+                break;
+            case '\t':
+                if (xmllintBufAdd(buf, "\\t", 2) != 0)
+                    return -1;
+                break;
+            default:
+                if (*cur < 0x20) {
+                    snprintf(tmp, sizeof(tmp), "\\u%04x", *cur);
+                    if (xmllintBufAdd(buf, tmp, 6) != 0)
+                        return -1;
+                } else {
+                    if (xmlBufferAdd(buf, cur, 1) != 0)
+                        return -1;
+                }
+        }
+    }
+
+    return xmllintBufAdd(buf, "\"", 1);
+}
+
+static int
+xmllintBufAddInt(xmlBufferPtr buf, int value) {
+    char tmp[32];
+    int len = snprintf(tmp, sizeof(tmp), "%d", value);
+    if (len <= 0)
+        return -1;
+    return xmllintBufAdd(buf, tmp, len);
+}
+
+static int
+xmllintBufAddKey(xmlBufferPtr buf, const char *key) {
+    if (xmllintBufEscape(buf, key) != 0)
+        return -1;
+    return xmllintBufAdd(buf, ":", 1);
+}
+
+static const char *
+xmllintRedactValue(const xmllintState *lint, unsigned flag,
+                   const char *value) {
+    if ((lint == NULL) || (value == NULL))
+        return value;
+    if ((lint->errorRedactFlags & flag) == 0)
+        return value;
+    return "[redacted]";
+}
+
+static int
+xmllintBufAddOptions(xmlBufferPtr buf, const char *key, int options,
+                     const xmllintOptName *defs) {
+    int i;
+    int first = 1;
+
+    if (xmllintBufAdd(buf, ",", 1) != 0)
+        return -1;
+    if (xmllintBufAddKey(buf, key) != 0)
+        return -1;
+    if (xmllintBufAdd(buf, "[", 1) != 0)
+        return -1;
+    for (i = 0; defs[i].name != NULL; i++) {
+        if ((options & defs[i].flag) == 0)
+            continue;
+        if (!first) {
+            if (xmllintBufAdd(buf, ",", 1) != 0)
+                return -1;
+        }
+        if (xmllintBufEscape(buf, defs[i].name) != 0)
+            return -1;
+        first = 0;
+    }
+    return xmllintBufAdd(buf, "]", 1);
+}
+
+static int
+xmllintBufAddChecksum(xmlBufferPtr buf, const char *key, int valid,
+                      unsigned long long checksum) {
+    if (xmllintBufAdd(buf, ",", 1) != 0)
+        return -1;
+    if (xmllintBufAddKey(buf, key) != 0)
+        return -1;
+    if (!valid)
+        return xmllintBufAdd(buf, "null", 4);
+    {
+        char tmp[32];
+        int len = snprintf(tmp, sizeof(tmp), "\"%016llx\"", checksum);
+        if (len <= 0)
+            return -1;
+        return xmllintBufAdd(buf, tmp, len);
+    }
+}
+
+static int
+xmllintBufAddWindow(xmlBufferPtr buf, const char *key, xmllintState *lint) {
+    xmlParserCtxtPtr ctxt;
+    const xmlChar *start = NULL;
+    int size = 0;
+    int offset = 0;
+    int len;
+    char *tmp;
+
+    if ((lint == NULL) || (lint->errorJsonWindow <= 0))
+        return 0;
+
+    if (lint->errorRedactFlags & XMLLINT_REDACT_WINDOW) {
+        if (xmllintBufAdd(buf, ",", 1) != 0 ||
+            xmllintBufAddKey(buf, key) != 0)
+            return -1;
+        return xmllintBufAdd(buf, "null", 4);
+    }
+
+    ctxt = lint->ctxt;
+    if (ctxt == NULL)
+        return 0;
+
+    if (xmlCtxtGetInputWindow(ctxt, 0, &start, &size, &offset) < 0)
+        return 0;
+    if ((start == NULL) || (size <= 0))
+        return 0;
+
+    if (offset < 0)
+        offset = 0;
+    if (offset > size)
+        offset = size;
+
+    len = lint->errorJsonWindow;
+    if (len > size - offset)
+        len = size - offset;
+
+    tmp = xmlMalloc((size_t) len + 1);
+    if (tmp == NULL)
+        return -1;
+    memcpy(tmp, start + offset, (size_t) len);
+    tmp[len] = '\0';
+
+    if (xmllintBufAdd(buf, ",", 1) != 0 ||
+        xmllintBufAddKey(buf, key) != 0 ||
+        xmllintBufEscape(buf, tmp) != 0) {
+        xmlFree(tmp);
+        return -1;
+    }
+    xmlFree(tmp);
+    return 0;
+}
+
+static unsigned long long
+xmllintErrorFingerprint(const xmlError *error);
+
+static int
+xmllintJsonErrorToBuffer(xmlBufferPtr buf, xmllintState *lint,
+                         const xmlError *error, const char *filename) {
+    static const xmllintOptName xmlOpts[] = {
+        { XML_PARSE_RECOVER, "RECOVER" },
+        { XML_PARSE_NOENT, "NOENT" },
+        { XML_PARSE_DTDLOAD, "DTDLOAD" },
+        { XML_PARSE_DTDATTR, "DTDATTR" },
+        { XML_PARSE_DTDVALID, "DTDVALID" },
+        { XML_PARSE_NOERROR, "NOERROR" },
+        { XML_PARSE_NOWARNING, "NOWARNING" },
+        { XML_PARSE_PEDANTIC, "PEDANTIC" },
+        { XML_PARSE_NOBLANKS, "NOBLANKS" },
+        { XML_PARSE_SAX1, "SAX1" },
+        { XML_PARSE_XINCLUDE, "XINCLUDE" },
+        { XML_PARSE_NONET, "NONET" },
+        { XML_PARSE_NODICT, "NODICT" },
+        { XML_PARSE_NSCLEAN, "NSCLEAN" },
+        { XML_PARSE_NOCDATA, "NOCDATA" },
+        { XML_PARSE_NOXINCNODE, "NOXINCNODE" },
+        { XML_PARSE_COMPACT, "COMPACT" },
+        { XML_PARSE_OLD10, "OLDXML10" },
+        { XML_PARSE_NOBASEFIX, "NOBASEFIX" },
+        { XML_PARSE_HUGE, "HUGE" },
+        { XML_PARSE_BIG_LINES, "BIG_LINES" },
+        { XML_PARSE_NO_XXE, "NO_XXE" },
+        { XML_PARSE_UNZIP, "UNZIP" },
+        { XML_PARSE_NO_SYS_CATALOG, "NO_SYS_CATALOG" },
+        { XML_PARSE_CATALOG_PI, "CATALOG_PI" },
+        { XML_PARSE_SKIP_IDS, "SKIP_IDS" },
+        { XML_PARSE_REQUIRE_LOADER, "REQUIRE_LOADER" },
+        { 0, NULL }
+    };
+#ifdef LIBXML_HTML_ENABLED
+    static const xmllintOptName htmlOpts[] = {
+        { HTML_PARSE_RECOVER, "RECOVER" },
+        { HTML_PARSE_NODEFDTD, "NODEFDTD" },
+        { HTML_PARSE_NOERROR, "NOERROR" },
+        { HTML_PARSE_NOWARNING, "NOWARNING" },
+        { HTML_PARSE_PEDANTIC, "PEDANTIC" },
+        { HTML_PARSE_NOBLANKS, "NOBLANKS" },
+        { HTML_PARSE_NONET, "NONET" },
+        { HTML_PARSE_NOIMPLIED, "NOIMPLIED" },
+        { HTML_PARSE_COMPACT, "COMPACT" },
+        { HTML_PARSE_HTML5, "HTML5" },
+        { HTML_PARSE_BIG_LINES, "BIG_LINES" },
+        { HTML_PARSE_IGNORE_ENC, "IGNORE_ENC" },
+        { HTML_PARSE_HUGE, "HUGE" },
+        { 0, NULL }
+    };
+#endif
+
+    if (xmllintBufAdd(buf, "{", 1) != 0)
+        return -1;
+    if (xmllintBufAddKey(buf, "schema_version") != 0 ||
+        xmllintBufAddInt(buf, XMLLINT_JSON_SCHEMA_VERSION) != 0)
+        return -1;
+    {
+        const char *file = xmllintRedactValue(lint, XMLLINT_REDACT_FILE,
+                                              filename);
+        const char *message = xmllintRedactValue(lint, XMLLINT_REDACT_MESSAGE,
+                                                 error->message);
+        const char *str1 = xmllintRedactValue(lint, XMLLINT_REDACT_STR1,
+                                              error->str1);
+        const char *str2 = xmllintRedactValue(lint, XMLLINT_REDACT_STR2,
+                                              error->str2);
+        const char *str3 = xmllintRedactValue(lint, XMLLINT_REDACT_STR3,
+                                              error->str3);
+        const char *resourceType = str2;
+        const char *stage = str3;
+
+        if (xmllintBufAdd(buf, ",", 1) != 0)
+            return -1;
+        if (xmllintBufAddKey(buf, "file") != 0 ||
+            xmllintBufEscape(buf, file) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"domain\":", 10) != 0 ||
+            xmllintBufAddInt(buf, error->domain) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"code\":", 8) != 0 ||
+            xmllintBufAddInt(buf, error->code) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"level\":", 9) != 0 ||
+            xmllintBufAddInt(buf, error->level) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"line\":", 8) != 0 ||
+            xmllintBufAddInt(buf, error->line) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"column\":", 10) != 0 ||
+            xmllintBufAddInt(buf, error->int2) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"message\":", 11) != 0 ||
+            xmllintBufEscape(buf, message) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"str1\":", 8) != 0 ||
+            xmllintBufEscape(buf, str1) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"str2\":", 8) != 0 ||
+            xmllintBufEscape(buf, str2) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"str3\":", 8) != 0 ||
+            xmllintBufEscape(buf, str3) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"resource_type\":", 17) != 0 ||
+            xmllintBufEscape(buf, resourceType) != 0)
+            return -1;
+        if (xmllintBufAdd(buf, ",\"stage\":", 9) != 0 ||
+            xmllintBufEscape(buf, stage) != 0)
+            return -1;
+    }
+    if (xmllintBufAddOptions(buf, "parse_options",
+                             lint->parseOptions, xmlOpts) != 0)
+        return -1;
+#ifdef LIBXML_HTML_ENABLED
+    if (lint->appOptions & XML_LINT_HTML_ENABLED) {
+        if (xmllintBufAddOptions(buf, "html_options",
+                                 lint->htmlOptions, htmlOpts) != 0)
+            return -1;
+    }
+#endif
+    if (xmllintBufAddWindow(buf, "window", lint) != 0)
+        return -1;
+    if (xmllintBufAddChecksum(buf, "checksum",
+                              lint->checksumValid,
+                              lint->errorChecksum) != 0)
+        return -1;
+    if (xmllintBufAdd(buf, ",\"fingerprint\":\"", 17) != 0)
+        return -1;
+    {
+        char tmp[32];
+        unsigned long long fp = xmllintErrorFingerprint(error);
+        int len = snprintf(tmp, sizeof(tmp), "%016llx", fp);
+        if (len <= 0)
+            return -1;
+        if (xmllintBufAdd(buf, tmp, len) != 0)
+            return -1;
+    }
+    if (xmllintBufAdd(buf, "\"", 1) != 0)
+        return -1;
+    if (xmllintBufAdd(buf, "}", 1) != 0)
+        return -1;
+    return 0;
+}
+
+#ifndef _WIN32
+static void
+xmllintSyslogError(xmllintState *lint, const xmlError *error) {
+    xmlBufferPtr buf;
+
+    if ((lint == NULL) || (error == NULL))
+        return;
+
+    buf = xmlBufferCreate();
+    if (buf == NULL)
+        return;
+
+    if (xmllintJsonErrorToBuffer(buf, lint, error,
+                                 lint->errorJsonArrayFile) == 0) {
+        syslog(LOG_ERR, "%s", (const char *) xmlBufferContent(buf));
+    }
+
+    xmlBufferFree(buf);
+}
+#endif
+static void
+xmllintJsonIndent(FILE *out, int pretty, int level) {
+    int i;
+
+    if (!pretty)
+        return;
+    fputc('\n', out);
+    for (i = 0; i < level; i++)
+        fputs("  ", out);
+}
+
+static void
+xmllintJsonKey(FILE *out, int pretty, int level, const char *key) {
+    xmllintJsonIndent(out, pretty, level);
+    xmllintJsonEscape(out, key);
+    fputs(pretty ? ": " : ":", out);
+}
+
+static void
+xmllintJsonAddInt(FILE *out, int value) {
+    fprintf(out, "%d", value);
+}
+
+static void
+xmllintJsonAddLongLong(FILE *out, long long value) {
+    fprintf(out, "%lld", value);
+}
+
+static void
+xmllintJsonAddTime(FILE *out, int pretty, int level, const char *key) {
+    struct timeval tv;
+
+    if (gettimeofday(&tv, NULL) != 0)
+        return;
+
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, key);
+    fputs("{", out);
+    xmllintJsonKey(out, pretty, level + 1, "sec");
+    xmllintJsonAddInt(out, (int) tv.tv_sec);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level + 1, "usec");
+    xmllintJsonAddInt(out, (int) tv.tv_usec);
+    xmllintJsonIndent(out, pretty, level);
+    fputs("}", out);
+}
+
+static const char *
+xmllintDomainName(int domain);
+
+static void
+xmllintJsonAddChecksum(FILE *out, int pretty, int level,
+                       const char *key, int valid,
+                       unsigned long long checksum) {
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, key);
+    if (!valid) {
+        fputs("null", out);
+    } else {
+        fprintf(out, "\"%016llx\"", checksum);
+    }
+}
+
+static unsigned long long
+xmllintErrorFingerprint(const xmlError *error) {
+    unsigned long long hash = 1469598103934665603ULL;
+    const unsigned char *cur;
+    int vals[3];
+    int i;
+
+    if (error == NULL)
+        return 0;
+
+    vals[0] = error->domain;
+    vals[1] = error->code;
+    vals[2] = error->level;
+    for (i = 0; i < 3; i++) {
+        hash ^= (unsigned char) (vals[i] & 0xFF);
+        hash *= 1099511628211ULL;
+        hash ^= (unsigned char) ((vals[i] >> 8) & 0xFF);
+        hash *= 1099511628211ULL;
+        hash ^= (unsigned char) ((vals[i] >> 16) & 0xFF);
+        hash *= 1099511628211ULL;
+        hash ^= (unsigned char) ((vals[i] >> 24) & 0xFF);
+        hash *= 1099511628211ULL;
+    }
+
+    for (cur = (const unsigned char *) (error->message ? error->message : "");
+         *cur != '\0'; cur++) {
+        hash ^= *cur;
+        hash *= 1099511628211ULL;
+    }
+    for (cur = (const unsigned char *) (error->str1 ? error->str1 : "");
+         *cur != '\0'; cur++) {
+        hash ^= *cur;
+        hash *= 1099511628211ULL;
+    }
+    for (cur = (const unsigned char *) (error->str2 ? error->str2 : "");
+         *cur != '\0'; cur++) {
+        hash ^= *cur;
+        hash *= 1099511628211ULL;
+    }
+    for (cur = (const unsigned char *) (error->str3 ? error->str3 : "");
+         *cur != '\0'; cur++) {
+        hash ^= *cur;
+        hash *= 1099511628211ULL;
+    }
+
+    return hash;
+}
+
+static void
+xmllintJsonAddOptions(FILE *out, int pretty, int level,
+                      const char *key, int options,
+                      const xmllintOptName *defs) {
+    int first = 1;
+    int i;
+
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, key);
+    fputs("[", out);
+    for (i = 0; defs[i].name != NULL; i++) {
+        if ((options & defs[i].flag) == 0)
+            continue;
+        if (!first)
+            fputc(',', out);
+        xmllintJsonIndent(out, pretty, level + 1);
+        xmllintJsonEscape(out, defs[i].name);
+        first = 0;
+    }
+    if (!first)
+        xmllintJsonIndent(out, pretty, level);
+    fputs("]", out);
+}
+
+static void
+xmllintJsonAddWindow(FILE *out, int pretty, int level,
+                     const char *key, xmllintState *lint) {
+    xmlParserCtxtPtr ctxt;
+    const xmlChar *start = NULL;
+    int size = 0;
+    int offset = 0;
+    int len;
+    char *buf;
+
+    if ((lint == NULL) || (lint->errorJsonWindow <= 0))
+        return;
+
+    if (lint->errorRedactFlags & XMLLINT_REDACT_WINDOW) {
+        fputc(pretty ? ',' : ',', out);
+        xmllintJsonKey(out, pretty, level, key);
+        fputs("null", out);
+        return;
+    }
+
+    ctxt = lint->ctxt;
+    if (ctxt == NULL)
+        return;
+
+    if (xmlCtxtGetInputWindow(ctxt, 0, &start, &size, &offset) < 0)
+        return;
+
+    if ((start == NULL) || (size <= 0))
+        return;
+
+    if (offset < 0)
+        offset = 0;
+    if (offset > size)
+        offset = size;
+
+    len = lint->errorJsonWindow;
+    if (len > size - offset)
+        len = size - offset;
+
+    buf = xmlMalloc((size_t) len + 1);
+    if (buf == NULL)
+        return;
+    memcpy(buf, start + offset, (size_t) len);
+    buf[len] = '\0';
+
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, key);
+    xmllintJsonEscape(out, buf);
+    xmlFree(buf);
+}
+
+static void
+xmllintJsonAddFingerprint(FILE *out, int pretty, int level,
+                          const char *key, const xmlError *error) {
+    unsigned long long fp = xmllintErrorFingerprint(error);
+
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, key);
+    fprintf(out, "\"%016llx\"", fp);
+}
+
+static void
+xmllintErrorStatsReset(xmllintState *lint) {
+    int i;
+
+    if (lint == NULL)
+        return;
+    memset(lint->errorDomainCounts, 0, sizeof(lint->errorDomainCounts));
+    memset(lint->errorLevelCounts, 0, sizeof(lint->errorLevelCounts));
+    lint->errorCodeCountsCount = 0;
+    for (i = 0; i < lint->errorStageCountsCount; i++) {
+        xmlFree(lint->errorStageCounts[i].name);
+        lint->errorStageCounts[i].name = NULL;
+    }
+    lint->errorStageCountsCount = 0;
+    getTime(&lint->errorStatsStart);
+}
+
+static void
+xmllintErrorStageAdd(xmllintState *lint, const xmlError *error) {
+    const char *stage;
+    xmlTime now;
+    long long msec;
+    int i;
+
+    if ((lint == NULL) || (error == NULL))
+        return;
+
+    stage = error->str3 ? error->str3 : "unknown";
+    getTime(&now);
+    msec = xmllintTimeDiffMs(&lint->errorStatsStart, &now);
+
+    for (i = 0; i < lint->errorStageCountsCount; i++) {
+        if (strcmp(lint->errorStageCounts[i].name, stage) == 0) {
+            lint->errorStageCounts[i].count += 1;
+            lint->errorStageCounts[i].lastMs = msec;
+            return;
+        }
+    }
+
+    if (lint->errorStageCountsCount == lint->errorStageCountsSize) {
+        int newSize = lint->errorStageCountsSize ? lint->errorStageCountsSize * 2 : 8;
+        xmllintStageCount *tmp = xmlRealloc(lint->errorStageCounts,
+                                            sizeof(*lint->errorStageCounts) *
+                                            newSize);
+        if (tmp == NULL)
+            return;
+        lint->errorStageCounts = tmp;
+        lint->errorStageCountsSize = newSize;
+    }
+
+    lint->errorStageCounts[lint->errorStageCountsCount].name =
+        xmlMemStrdup(stage);
+    if (lint->errorStageCounts[lint->errorStageCountsCount].name == NULL)
+        return;
+    lint->errorStageCounts[lint->errorStageCountsCount].count = 1;
+    lint->errorStageCounts[lint->errorStageCountsCount].firstMs = msec;
+    lint->errorStageCounts[lint->errorStageCountsCount].lastMs = msec;
+    lint->errorStageCountsCount += 1;
+}
+
+static void
+xmllintErrorStatsAdd(xmllintState *lint, const xmlError *error) {
+    int i;
+
+    if ((lint == NULL) || (error == NULL))
+        return;
+
+    if ((error->domain >= 0) && (error->domain <= XML_FROM_URI))
+        lint->errorDomainCounts[error->domain] += 1;
+
+    if ((error->level >= 0) && (error->level <= XML_ERR_FATAL))
+        lint->errorLevelCounts[error->level] += 1;
+
+    for (i = 0; i < lint->errorCodeCountsCount; i++) {
+        if (lint->errorCodeCounts[i].code == error->code) {
+            lint->errorCodeCounts[i].count += 1;
+            return;
+        }
+    }
+
+    if (lint->errorCodeCountsCount == lint->errorCodeCountsSize) {
+        int newSize = lint->errorCodeCountsSize ? lint->errorCodeCountsSize * 2 : 16;
+        xmllintCodeCount *tmp = xmlRealloc(lint->errorCodeCounts,
+                                           sizeof(*lint->errorCodeCounts) * newSize);
+        if (tmp == NULL)
+            return;
+        lint->errorCodeCounts = tmp;
+        lint->errorCodeCountsSize = newSize;
+    }
+
+    lint->errorCodeCounts[lint->errorCodeCountsCount].code = error->code;
+    lint->errorCodeCounts[lint->errorCodeCountsCount].count = 1;
+    lint->errorCodeCountsCount += 1;
+
+    xmllintErrorStageAdd(lint, error);
+}
+
+static void
+xmllintJsonWriteSummary(FILE *out, int pretty, int level, xmllintState *lint) {
+    int i;
+    int first;
+
+    if ((lint == NULL) || (!lint->errorJsonSummary))
+        return;
+
+    fputs("{", out);
+
+    xmllintJsonKey(out, pretty, level + 1, "by_level");
+    fputs("{", out);
+    first = 1;
+    for (i = 0; i <= XML_ERR_FATAL; i++) {
+        if (!first)
+            fputc(',', out);
+        xmllintJsonKey(out, pretty, level + 2,
+                       i == XML_ERR_NONE ? "none" :
+                       i == XML_ERR_WARNING ? "warning" :
+                       i == XML_ERR_ERROR ? "error" : "fatal");
+        xmllintJsonAddInt(out, lint->errorLevelCounts[i]);
+        first = 0;
+    }
+    xmllintJsonIndent(out, pretty, level + 1);
+    fputs("}", out);
+
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level + 1, "by_domain");
+    fputs("{", out);
+    first = 1;
+    for (i = 0; i <= XML_FROM_URI; i++) {
+        if (lint->errorDomainCounts[i] == 0)
+            continue;
+        if (!first)
+            fputc(',', out);
+        xmllintJsonKey(out, pretty, level + 2, xmllintDomainName(i));
+        xmllintJsonAddInt(out, lint->errorDomainCounts[i]);
+        first = 0;
+    }
+    xmllintJsonIndent(out, pretty, level + 1);
+    fputs("}", out);
+
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level + 1, "by_code");
+    fputs("{", out);
+    first = 1;
+    for (i = 0; i < lint->errorCodeCountsCount; i++) {
+        char keyBuf[32];
+        snprintf(keyBuf, sizeof(keyBuf), "%d",
+                 lint->errorCodeCounts[i].code);
+        if (!first)
+            fputc(',', out);
+        xmllintJsonKey(out, pretty, level + 2, keyBuf);
+        xmllintJsonAddInt(out, lint->errorCodeCounts[i].count);
+        first = 0;
+    }
+    xmllintJsonIndent(out, pretty, level + 1);
+    fputs("}", out);
+
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level + 1, "by_stage");
+    fputs("{", out);
+    first = 1;
+    for (i = 0; i < lint->errorStageCountsCount; i++) {
+        long long span;
+
+        if (!first)
+            fputc(',', out);
+        xmllintJsonKey(out, pretty, level + 2,
+                       lint->errorStageCounts[i].name);
+        fputs("{", out);
+        xmllintJsonKey(out, pretty, level + 3, "count");
+        xmllintJsonAddInt(out, lint->errorStageCounts[i].count);
+        fputc(pretty ? ',' : ',', out);
+        xmllintJsonKey(out, pretty, level + 3, "first_ms");
+        xmllintJsonAddLongLong(out, lint->errorStageCounts[i].firstMs);
+        fputc(pretty ? ',' : ',', out);
+        xmllintJsonKey(out, pretty, level + 3, "last_ms");
+        xmllintJsonAddLongLong(out, lint->errorStageCounts[i].lastMs);
+        span = lint->errorStageCounts[i].lastMs -
+               lint->errorStageCounts[i].firstMs;
+        fputc(pretty ? ',' : ',', out);
+        xmllintJsonKey(out, pretty, level + 3, "span_ms");
+        xmllintJsonAddLongLong(out, span < 0 ? 0 : span);
+        xmllintJsonIndent(out, pretty, level + 2);
+        fputs("}", out);
+        first = 0;
+    }
+    xmllintJsonIndent(out, pretty, level + 1);
+    fputs("}", out);
+
+    xmllintJsonIndent(out, pretty, level);
+    fputs("}", out);
+}
+
+static void
+xmllintWriteXmlError(FILE *out, xmllintState *lint,
+                     const xmlError *error, const char *filename) {
+    xmlError tmp;
+    xmlChar *xml = NULL;
+    int len = 0;
+    const char *file;
+
+    if ((out == NULL) || (lint == NULL) || (error == NULL))
+        return;
+
+    file = filename ? filename : error->file;
+
+    tmp = *error;
+    tmp.file = (char *) xmllintRedactValue(lint, XMLLINT_REDACT_FILE, file);
+    tmp.message = (char *) xmllintRedactValue(lint, XMLLINT_REDACT_MESSAGE,
+                                              error->message);
+    tmp.str1 = (char *) xmllintRedactValue(lint, XMLLINT_REDACT_STR1,
+                                           error->str1);
+    tmp.str2 = (char *) xmllintRedactValue(lint, XMLLINT_REDACT_STR2,
+                                           error->str2);
+    tmp.str3 = (char *) xmllintRedactValue(lint, XMLLINT_REDACT_STR3,
+                                           error->str3);
+
+    if ((xmlErrorToXml(&tmp, &xml, &len) == 0) && (xml != NULL)) {
+        fwrite(xml, 1, (size_t) len, out);
+        fputc('\n', out);
+    }
+    xmlFree(xml);
+}
+
+static const char *
+xmllintDomainName(int domain) {
+    switch (domain) {
+        case XML_FROM_NONE: return "none";
+        case XML_FROM_PARSER: return "parser";
+        case XML_FROM_TREE: return "tree";
+        case XML_FROM_NAMESPACE: return "namespace";
+        case XML_FROM_DTD: return "dtd";
+        case XML_FROM_HTML: return "html";
+        case XML_FROM_MEMORY: return "memory";
+        case XML_FROM_OUTPUT: return "output";
+        case XML_FROM_IO: return "io";
+        case XML_FROM_FTP: return "ftp";
+        case XML_FROM_HTTP: return "http";
+        case XML_FROM_XINCLUDE: return "xinclude";
+        case XML_FROM_XPATH: return "xpath";
+        case XML_FROM_XPOINTER: return "xpointer";
+        case XML_FROM_REGEXP: return "regexp";
+        case XML_FROM_DATATYPE: return "datatype";
+        case XML_FROM_SCHEMASP: return "schemasp";
+        case XML_FROM_SCHEMASV: return "schemasv";
+        case XML_FROM_RELAXNGP: return "relaxngp";
+        case XML_FROM_RELAXNGV: return "relaxngv";
+        case XML_FROM_CATALOG: return "catalog";
+        case XML_FROM_C14N: return "c14n";
+        case XML_FROM_XSLT: return "xslt";
+        case XML_FROM_VALID: return "valid";
+        case XML_FROM_CHECK: return "check";
+        case XML_FROM_WRITER: return "writer";
+        case XML_FROM_MODULE: return "module";
+        case XML_FROM_I18N: return "i18n";
+        case XML_FROM_SCHEMATRONV: return "schematronv";
+        case XML_FROM_BUFFER: return "buffer";
+        case XML_FROM_URI: return "uri";
+        default: return "unknown";
+    }
+}
+
+static unsigned long long
+xmllintChecksumFile(const char *filename, int *ok) {
+    FILE *fp;
+    unsigned long long hash = 1469598103934665603ULL;
+    int c;
+
+    *ok = 0;
+    if ((filename == NULL) || (strcmp(filename, "-") == 0))
+        return 0;
+
+    fp = fopen(filename, "rb");
+    if (fp == NULL)
+        return 0;
+
+    while ((c = fgetc(fp)) != EOF) {
+        hash ^= (unsigned char) c;
+        hash *= 1099511628211ULL;
+    }
+
+    fclose(fp);
+    *ok = 1;
+    return hash;
+}
+
+static void
+xmllintWriteJsonError(FILE *out, xmllintState *lint,
+                      const xmlError *error, const char *filename) {
+    static const xmllintOptName xmlOpts[] = {
+        { XML_PARSE_RECOVER, "RECOVER" },
+        { XML_PARSE_NOENT, "NOENT" },
+        { XML_PARSE_DTDLOAD, "DTDLOAD" },
+        { XML_PARSE_DTDATTR, "DTDATTR" },
+        { XML_PARSE_DTDVALID, "DTDVALID" },
+        { XML_PARSE_NOERROR, "NOERROR" },
+        { XML_PARSE_NOWARNING, "NOWARNING" },
+        { XML_PARSE_PEDANTIC, "PEDANTIC" },
+        { XML_PARSE_NOBLANKS, "NOBLANKS" },
+        { XML_PARSE_SAX1, "SAX1" },
+        { XML_PARSE_XINCLUDE, "XINCLUDE" },
+        { XML_PARSE_NONET, "NONET" },
+        { XML_PARSE_NODICT, "NODICT" },
+        { XML_PARSE_NSCLEAN, "NSCLEAN" },
+        { XML_PARSE_NOCDATA, "NOCDATA" },
+        { XML_PARSE_NOXINCNODE, "NOXINCNODE" },
+        { XML_PARSE_COMPACT, "COMPACT" },
+        { XML_PARSE_OLD10, "OLDXML10" },
+        { XML_PARSE_NOBASEFIX, "NOBASEFIX" },
+        { XML_PARSE_HUGE, "HUGE" },
+        { XML_PARSE_BIG_LINES, "BIG_LINES" },
+        { XML_PARSE_NO_XXE, "NO_XXE" },
+        { XML_PARSE_UNZIP, "UNZIP" },
+        { XML_PARSE_NO_SYS_CATALOG, "NO_SYS_CATALOG" },
+        { XML_PARSE_CATALOG_PI, "CATALOG_PI" },
+        { XML_PARSE_SKIP_IDS, "SKIP_IDS" },
+        { XML_PARSE_REQUIRE_LOADER, "REQUIRE_LOADER" },
+        { 0, NULL }
+    };
+#ifdef LIBXML_HTML_ENABLED
+    static const xmllintOptName htmlOpts[] = {
+        { HTML_PARSE_RECOVER, "RECOVER" },
+        { HTML_PARSE_NODEFDTD, "NODEFDTD" },
+        { HTML_PARSE_NOERROR, "NOERROR" },
+        { HTML_PARSE_NOWARNING, "NOWARNING" },
+        { HTML_PARSE_PEDANTIC, "PEDANTIC" },
+        { HTML_PARSE_NOBLANKS, "NOBLANKS" },
+        { HTML_PARSE_NONET, "NONET" },
+        { HTML_PARSE_NOIMPLIED, "NOIMPLIED" },
+        { HTML_PARSE_COMPACT, "COMPACT" },
+        { HTML_PARSE_HTML5, "HTML5" },
+        { HTML_PARSE_BIG_LINES, "BIG_LINES" },
+        { HTML_PARSE_IGNORE_ENC, "IGNORE_ENC" },
+        { HTML_PARSE_HUGE, "HUGE" },
+        { 0, NULL }
+    };
+#endif
+    int pretty = lint->errorJsonPretty;
+    int level = pretty ? 1 : 0;
+    const char *file = xmllintRedactValue(lint, XMLLINT_REDACT_FILE, filename);
+    const char *message = xmllintRedactValue(lint, XMLLINT_REDACT_MESSAGE,
+                                             error->message);
+    const char *str1 = xmllintRedactValue(lint, XMLLINT_REDACT_STR1,
+                                          error->str1);
+    const char *str2 = xmllintRedactValue(lint, XMLLINT_REDACT_STR2,
+                                          error->str2);
+    const char *str3 = xmllintRedactValue(lint, XMLLINT_REDACT_STR3,
+                                          error->str3);
+    const char *resourceType = str2;
+    const char *stage = str3;
+
+    fputs("{", out);
+    xmllintJsonKey(out, pretty, level, "schema_version");
+    xmllintJsonAddInt(out, XMLLINT_JSON_SCHEMA_VERSION);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "file");
+    xmllintJsonEscape(out, file);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "domain");
+    xmllintJsonAddInt(out, error->domain);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "code");
+    xmllintJsonAddInt(out, error->code);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "level");
+    xmllintJsonAddInt(out, error->level);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "line");
+    xmllintJsonAddInt(out, error->line);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "column");
+    xmllintJsonAddInt(out, error->int2);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "message");
+    xmllintJsonEscape(out, message);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "str1");
+    xmllintJsonEscape(out, str1);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "str2");
+    xmllintJsonEscape(out, str2);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "str3");
+    xmllintJsonEscape(out, str3);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "resource_type");
+    xmllintJsonEscape(out, resourceType);
+    fputc(pretty ? ',' : ',', out);
+    xmllintJsonKey(out, pretty, level, "stage");
+    xmllintJsonEscape(out, stage);
+    xmllintJsonAddOptions(out, pretty, level, "parse_options",
+                          lint->parseOptions, xmlOpts);
+#ifdef LIBXML_HTML_ENABLED
+    if (lint->appOptions & XML_LINT_HTML_ENABLED) {
+        xmllintJsonAddOptions(out, pretty, level, "html_options",
+                              lint->htmlOptions, htmlOpts);
+    }
+#endif
+    xmllintJsonAddWindow(out, pretty, level, "window", lint);
+    xmllintJsonAddChecksum(out, pretty, level, "checksum",
+                           lint->checksumValid, lint->errorChecksum);
+    xmllintJsonAddFingerprint(out, pretty, level, "fingerprint", error);
+    xmllintJsonAddTime(out, pretty, level, "timestamp");
+    xmllintJsonIndent(out, pretty, 0);
+    fputs("}", out);
+}
+
+static void
+xmllintStructuredError(void *ctx, const xmlError *error) {
+    xmllintState *lint = ctx;
+    FILE *out;
+    int emitJson;
+    int emitSyslog;
+    int emitXml;
+
+    if ((lint == NULL) || (error == NULL))
+        return;
+
+    xmllintErrorStatsAdd(lint, error);
+
+    emitJson = lint->errorJson;
+    emitSyslog = lint->errorSyslog;
+    emitXml = lint->errorXml;
+
+    if ((lint->errorJsonLimit > 0) &&
+        (lint->errorJsonCount >= lint->errorJsonLimit)) {
+        emitJson = 0;
+        emitSyslog = 0;
+    }
+
+    if (!emitJson && !emitSyslog && !emitXml)
+        return;
+
+    if (emitJson) {
+        if ((error->level == XML_ERR_WARNING) &&
+            (lint->errorJsonWarnStream != NULL)) {
+            out = lint->errorJsonWarnStream;
+        } else {
+            out = lint->errorJsonStream ? lint->errorJsonStream
+                                        : lint->errStream;
+        }
+
+        if (lint->errorJsonArray) {
+            if (lint->errorJsonArrayCount > 0)
+                fputc(',', out);
+            xmllintWriteJsonError(out, lint, error, lint->errorJsonArrayFile);
+            lint->errorJsonArrayCount += 1;
+        } else {
+            xmllintWriteJsonError(out, lint, error, lint->errorJsonArrayFile);
+            fputc('\n', out);
+        }
+
+        lint->errorJsonCount += 1;
+    }
+
+    if (emitXml) {
+        FILE *xmlOut = lint->errorXmlStream ? lint->errorXmlStream
+                                            : lint->errStream;
+        xmllintWriteXmlError(xmlOut, lint, error, lint->errorJsonArrayFile);
+    }
+
+#ifndef _WIN32
+    if (emitSyslog)
+        xmllintSyslogError(lint, error);
+#endif
+}
+
+static void
+xmllintDumpErrorRing(xmllintState *lint, xmlParserCtxtPtr ctxt,
+                     const char *filename) {
+    xmlError *errors;
+    int count;
+    int allocCount;
+    int i;
+
+    if ((lint == NULL) || (ctxt == NULL))
+        return;
+    if (lint->errorRingSize <= 0)
+        return;
+
+    count = xmlCtxtGetErrorRing(ctxt, NULL, 0);
+    if (count < 0)
+        return;
+
+    allocCount = (count > 0) ? count : 1;
+    errors = xmlMalloc(sizeof(*errors) * allocCount);
+    if (errors == NULL)
+        return;
+    memset(errors, 0, sizeof(*errors) * allocCount);
+
+    if (count > 0) {
+        if (xmlCtxtGetErrorRing(ctxt, errors, count) < 0) {
+            xmlFree(errors);
+            return;
+        }
+    }
+
+    {
+        FILE *out = lint->errorRingDumpStream ? lint->errorRingDumpStream :
+                                                lint->errStream;
+    fputs("{\"schema_version\":", out);
+    xmllintJsonAddInt(out, XMLLINT_JSON_SCHEMA_VERSION);
+    fputs(",\"file\":", out);
+    xmllintJsonEscape(out, xmllintRedactValue(lint, XMLLINT_REDACT_FILE,
+                                             filename));
+    fputs(",\"errors\":[", out);
+        for (i = 0; i < count; i++) {
+            if (i > 0)
+                fputc(',', out);
+            xmllintWriteJsonError(out, lint, &errors[i], filename);
+        }
+    fputs("]}\n", out);
+    }
+
+    for (i = 0; i < count; i++)
+        xmlResetError(&errors[i]);
+    xmlFree(errors);
+}
+
+static int
+xmllintWriteBinHeader(FILE *out) {
+    static const unsigned char header[] = { 'X', 'E', 'R', 'B', 0, 0, 0, 1 };
+
+    if (fwrite(header, 1, sizeof(header), out) != sizeof(header))
+        return -1;
+    return 0;
+}
+
+static int
+xmllintWriteBinRecord(FILE *out, const unsigned char *data, unsigned int len) {
+    unsigned char hdr[4];
+
+    hdr[0] = (unsigned char) ((len >> 24) & 0xFF);
+    hdr[1] = (unsigned char) ((len >> 16) & 0xFF);
+    hdr[2] = (unsigned char) ((len >> 8) & 0xFF);
+    hdr[3] = (unsigned char) (len & 0xFF);
+
+    if (fwrite(hdr, 1, sizeof(hdr), out) != sizeof(hdr))
+        return -1;
+    if (len > 0 && fwrite(data, 1, len, out) != len)
+        return -1;
+
+    return 0;
+}
+
+static void
+xmllintDumpErrorRingBinary(xmllintState *lint, xmlParserCtxtPtr ctxt,
+                           const char *filename) {
+    xmlError *errors;
+    xmlBufferPtr buf;
+    int count;
+    int allocCount;
+    int i;
+    FILE *out;
+
+    if ((lint == NULL) || (ctxt == NULL))
+        return;
+
+    if (lint->errorRingDumpBinStream == NULL)
+        return;
+
+    if (lint->errorRingSize <= 0)
+        return;
+
+    count = xmlCtxtGetErrorRing(ctxt, NULL, 0);
+    if (count < 0)
+        return;
+
+    allocCount = (count > 0) ? count : 1;
+    errors = xmlMalloc(sizeof(*errors) * allocCount);
+    if (errors == NULL)
+        return;
+    memset(errors, 0, sizeof(*errors) * allocCount);
+
+    if (count > 0) {
+        if (xmlCtxtGetErrorRing(ctxt, errors, count) < 0) {
+            xmlFree(errors);
+            return;
+        }
+    }
+
+    buf = xmlBufferCreate();
+    if (buf == NULL) {
+        for (i = 0; i < count; i++)
+            xmlResetError(&errors[i]);
+        xmlFree(errors);
+        return;
+    }
+
+    if (xmllintBufAdd(buf, "{", 1) == 0 &&
+        xmllintBufAddKey(buf, "schema_version") == 0 &&
+        xmllintBufAddInt(buf, XMLLINT_JSON_SCHEMA_VERSION) == 0 &&
+        xmllintBufAdd(buf, ",", 1) == 0 &&
+        xmllintBufAddKey(buf, "file") == 0 &&
+        xmllintBufEscape(buf,
+                         xmllintRedactValue(lint, XMLLINT_REDACT_FILE,
+                                            filename)) == 0 &&
+        xmllintBufAdd(buf, ",\"errors\":[", 11) == 0) {
+        for (i = 0; i < count; i++) {
+            if (i > 0)
+                xmllintBufAdd(buf, ",", 1);
+            if (xmllintJsonErrorToBuffer(buf, lint, &errors[i], filename) != 0)
+                break;
+        }
+        if (i == count) {
+            xmllintBufAdd(buf, "]}", 2);
+        }
+    }
+
+    out = lint->errorRingDumpBinStream;
+    if (xmlBufferContent(buf) != NULL) {
+        xmllintWriteBinRecord(out,
+                              (const unsigned char *) xmlBufferContent(buf),
+                              (unsigned int) xmlBufferLength(buf));
+    }
+
+    xmlBufferFree(buf);
+
+    for (i = 0; i < count; i++)
+        xmlResetError(&errors[i]);
+    xmlFree(errors);
+}
+
+static void
+xmllintCborWriteType(FILE *out, unsigned int major, unsigned long long val) {
+    if (val < 24) {
+        fputc((int) ((major << 5) | val), out);
+    } else if (val <= 0xFF) {
+        fputc((int) ((major << 5) | 24), out);
+        fputc((int) val, out);
+    } else if (val <= 0xFFFF) {
+        fputc((int) ((major << 5) | 25), out);
+        fputc((int) ((val >> 8) & 0xFF), out);
+        fputc((int) (val & 0xFF), out);
+    } else if (val <= 0xFFFFFFFFULL) {
+        fputc((int) ((major << 5) | 26), out);
+        fputc((int) ((val >> 24) & 0xFF), out);
+        fputc((int) ((val >> 16) & 0xFF), out);
+        fputc((int) ((val >> 8) & 0xFF), out);
+        fputc((int) (val & 0xFF), out);
+    } else {
+        fputc((int) ((major << 5) | 27), out);
+        fputc((int) ((val >> 56) & 0xFF), out);
+        fputc((int) ((val >> 48) & 0xFF), out);
+        fputc((int) ((val >> 40) & 0xFF), out);
+        fputc((int) ((val >> 32) & 0xFF), out);
+        fputc((int) ((val >> 24) & 0xFF), out);
+        fputc((int) ((val >> 16) & 0xFF), out);
+        fputc((int) ((val >> 8) & 0xFF), out);
+        fputc((int) (val & 0xFF), out);
+    }
+}
+
+static void
+xmllintCborWriteText(FILE *out, const char *str) {
+    size_t len = str ? strlen(str) : 0;
+
+    xmllintCborWriteType(out, 3, (unsigned long long) len);
+    if (len > 0)
+        fwrite(str, 1, len, out);
+}
+
+static void
+xmllintDumpErrorRingCbor(xmllintState *lint, xmlParserCtxtPtr ctxt,
+                         const char *filename) {
+    xmlError *errors;
+    int count;
+    int allocCount;
+    int i;
+    FILE *out;
+
+    if ((lint == NULL) || (ctxt == NULL))
+        return;
+
+    if (lint->errorRingDumpCborStream == NULL)
+        return;
+
+    count = xmlCtxtGetErrorRing(ctxt, NULL, 0);
+    if (count < 0)
+        return;
+
+    allocCount = (count > 0) ? count : 1;
+    errors = xmlMalloc(sizeof(*errors) * allocCount);
+    if (errors == NULL)
+        return;
+    memset(errors, 0, sizeof(*errors) * allocCount);
+
+    if (count > 0) {
+        if (xmlCtxtGetErrorRing(ctxt, errors, count) < 0) {
+            xmlFree(errors);
+            return;
+        }
+    }
+
+    out = lint->errorRingDumpCborStream;
+    xmllintCborWriteType(out, 5, 2); /* map with 2 keys */
+    xmllintCborWriteText(out, "file");
+    xmllintCborWriteText(out,
+                         xmllintRedactValue(lint, XMLLINT_REDACT_FILE,
+                                            filename ? filename : ""));
+    xmllintCborWriteText(out, "errors");
+    xmllintCborWriteType(out, 4, (unsigned long long) count);
+    for (i = 0; i < count; i++) {
+        const char *message = xmllintRedactValue(lint, XMLLINT_REDACT_MESSAGE,
+                                                 errors[i].message);
+        const char *str1 = xmllintRedactValue(lint, XMLLINT_REDACT_STR1,
+                                              errors[i].str1);
+        const char *str2 = xmllintRedactValue(lint, XMLLINT_REDACT_STR2,
+                                              errors[i].str2);
+        const char *str3 = xmllintRedactValue(lint, XMLLINT_REDACT_STR3,
+                                              errors[i].str3);
+
+        xmllintCborWriteType(out, 5, 8); /* map with 8 keys */
+        xmllintCborWriteText(out, "domain");
+        xmllintCborWriteType(out, 0, (unsigned long long) errors[i].domain);
+        xmllintCborWriteText(out, "code");
+        xmllintCborWriteType(out, 0, (unsigned long long) errors[i].code);
+        xmllintCborWriteText(out, "level");
+        xmllintCborWriteType(out, 0, (unsigned long long) errors[i].level);
+        xmllintCborWriteText(out, "line");
+        xmllintCborWriteType(out, 0, (unsigned long long) errors[i].line);
+        xmllintCborWriteText(out, "column");
+        xmllintCborWriteType(out, 0, (unsigned long long) errors[i].int2);
+        xmllintCborWriteText(out, "message");
+        xmllintCborWriteText(out, message);
+        xmllintCborWriteText(out, "str1");
+        xmllintCborWriteText(out, str1);
+        xmllintCborWriteText(out, "str2");
+        xmllintCborWriteText(out, str2);
+        xmllintCborWriteText(out, "str3");
+        xmllintCborWriteText(out, str3);
+    }
+
+    for (i = 0; i < count; i++)
+        xmlResetError(&errors[i]);
+    xmlFree(errors);
+}
+
+static void
+xmllintStartErrorArray(xmllintState *lint, const char *filename) {
+    FILE *out;
+
+    if ((lint == NULL) || (!lint->errorJsonArray))
+        return;
+
+    out = lint->errorJsonStream ? lint->errorJsonStream : lint->errStream;
+    fputs("{\"schema_version\":", out);
+    xmllintJsonAddInt(out, XMLLINT_JSON_SCHEMA_VERSION);
+    fputs(",\"file\":", out);
+    xmllintJsonEscape(out, xmllintRedactValue(lint, XMLLINT_REDACT_FILE,
+                                             filename));
+    fputs(",\"errors\":[", out);
+    lint->errorJsonArrayOpen = 1;
+    lint->errorJsonArrayCount = 0;
+}
+
+static void
+xmllintFinishErrorArray(xmllintState *lint) {
+    FILE *out;
+
+    if ((lint == NULL) || (!lint->errorJsonArrayOpen))
+        return;
+
+    out = lint->errorJsonStream ? lint->errorJsonStream : lint->errStream;
+    fputs("]", out);
+    if (lint->errorJsonSummary)
+        xmllintJsonWriteSummary(out, lint->errorJsonPretty ? 1 : 0,
+                                lint->errorJsonPretty ? 1 : 0, lint);
+    if (lint->errorJsonChecksum)
+        xmllintJsonAddChecksum(out, lint->errorJsonPretty ? 1 : 0,
+                               lint->errorJsonPretty ? 1 : 0,
+                               "checksum",
+                               lint->checksumValid,
+                               lint->errorChecksum);
+    fputs("}\n", out);
+    lint->errorJsonArrayOpen = 0;
+}
+
+static void
+xmllintWriteSummaryLine(xmllintState *lint, const char *filename) {
+    FILE *out;
+
+    if ((lint == NULL) || (!lint->errorJsonSummary))
+        return;
+
+    out = lint->errorJsonStream ? lint->errorJsonStream : lint->errStream;
+    fputs("{\"schema_version\":", out);
+    xmllintJsonAddInt(out, XMLLINT_JSON_SCHEMA_VERSION);
+    fputs(",\"file\":", out);
+    xmllintJsonEscape(out, xmllintRedactValue(lint, XMLLINT_REDACT_FILE,
+                                             filename));
+    fputs(",\"summary\":", out);
+    xmllintJsonWriteSummary(out, 0, 0, lint);
+    if (lint->errorJsonChecksum)
+        xmllintJsonAddChecksum(out, 0, 0, "checksum",
+                               lint->checksumValid, lint->errorChecksum);
+    fputs("}\n", out);
 }
 
 /************************************************************************
@@ -601,6 +2085,20 @@ getTime(xmlTime *time) {
     time->sec = tv.tv_sec;
     time->usec = tv.tv_usec;
 #endif /* _WIN32 */
+}
+
+static long long
+xmllintTimeDiffMs(const xmlTime *start, const xmlTime *end) {
+    long long msec;
+
+    if ((start == NULL) || (end == NULL))
+        return 0;
+
+    msec = (long long) (end->sec - start->sec);
+    msec *= 1000;
+    msec += (long long) ((end->usec - start->usec) / 1000);
+
+    return msec;
 }
 
 /*
@@ -2422,6 +3920,26 @@ static void usage(FILE *f, const char *name) {
 #endif
     fprintf(f, "\t--maxmem nbbytes : limits memory allocation to nbbytes bytes\n");
     fprintf(f, "\t--nowarning : do not emit warnings from parser/validator\n");
+    fprintf(f, "\t--error-ring N : keep last N errors in a ring buffer\n");
+    fprintf(f, "\t--error-dedup N : suppress repeated errors after N occurrences\n");
+    fprintf(f, "\t--error-ring-dump : dump error ring as JSON after each file\n");
+    fprintf(f, "\t--error-ring-dump-file FILE : dump error ring JSON to FILE\n");
+    fprintf(f, "\t--error-ring-dump-cbor-file FILE : dump error ring as CBOR to FILE\n");
+    fprintf(f, "\t--error-ring-dump-bin-file FILE : dump error ring as binary frames to FILE\n");
+    fprintf(f, "\t--error-xml : emit structured errors as XML lines\n");
+    fprintf(f, "\t--error-xml-file FILE : write XML errors to FILE\n");
+    fprintf(f, "\t--error-json : emit structured errors as JSON lines\n");
+    fprintf(f, "\t--error-json-file FILE : write JSON errors to FILE\n");
+    fprintf(f, "\t--error-json-warn-file FILE : write JSON warnings to FILE\n");
+    fprintf(f, "\t--error-json-array : emit a JSON array per file\n");
+    fprintf(f, "\t--error-json-pretty : pretty-print JSON output\n");
+    fprintf(f, "\t--error-json-limit N : limit JSON errors emitted\n");
+    fprintf(f, "\t--error-json-summary : emit per-file summary JSON\n");
+    fprintf(f, "\t--error-json-window N : include N bytes of input context\n");
+    fprintf(f, "\t--error-json-checksum : include file checksum\n");
+    fprintf(f, "\t--error-redact LIST : redact fields (file,message,str1,str2,str3,window,all,none)\n");
+    fprintf(f, "\t--error-syslog : send JSON errors to syslog\n");
+    fprintf(f, "\t--error-syslog-facility NAME : set syslog facility (user,local0..local7)\n");
     fprintf(f, "\t--noblanks : drop (ignorable?) blanks spaces\n");
     fprintf(f, "\t--nocdata : replace cdata section with text nodes\n");
     fprintf(f, "\t--nodict : create document without dictionary\n");
@@ -2511,11 +4029,58 @@ parseInteger(unsigned long *result, FILE *errStream, const char *ctxt,
 }
 
 static int
+xmllintParseRedact(xmllintState *lint, FILE *errStream, const char *value) {
+    char *copy;
+    char *token;
+    unsigned flags;
+
+    if ((lint == NULL) || (value == NULL))
+        return(-1);
+
+    copy = xmlMemStrdup(value);
+    if (copy == NULL)
+        return(-1);
+
+    flags = lint->errorRedactFlags;
+    for (token = strtok(copy, ",");
+         token != NULL;
+         token = strtok(NULL, ",")) {
+        if (strcmp(token, "all") == 0) {
+            flags = XMLLINT_REDACT_ALL;
+        } else if (strcmp(token, "none") == 0) {
+            flags = 0;
+        } else if (strcmp(token, "file") == 0) {
+            flags |= XMLLINT_REDACT_FILE;
+        } else if (strcmp(token, "message") == 0) {
+            flags |= XMLLINT_REDACT_MESSAGE;
+        } else if (strcmp(token, "str1") == 0) {
+            flags |= XMLLINT_REDACT_STR1;
+        } else if (strcmp(token, "str2") == 0) {
+            flags |= XMLLINT_REDACT_STR2;
+        } else if (strcmp(token, "str3") == 0) {
+            flags |= XMLLINT_REDACT_STR3;
+        } else if (strcmp(token, "window") == 0) {
+            flags |= XMLLINT_REDACT_WINDOW;
+        } else {
+            fprintf(errStream, "error-redact: unknown token '%s'\n", token);
+            xmlFree(copy);
+            return(-1);
+        }
+    }
+
+    lint->errorRedactFlags = flags;
+    xmlFree(copy);
+    return(0);
+}
+
+static int
 skipArgs(const char *arg) {
     if ((!strcmp(arg, "-path")) ||
         (!strcmp(arg, "--path")) ||
         (!strcmp(arg, "-maxmem")) ||
         (!strcmp(arg, "--maxmem")) ||
+        (!strcmp(arg, "-error-ring")) ||
+        (!strcmp(arg, "--error-ring")) ||
 #ifdef LIBXML_OUTPUT_ENABLED
         (!strcmp(arg, "-o")) ||
         (!strcmp(arg, "-output")) ||
@@ -2553,6 +4118,28 @@ skipArgs(const char *arg) {
         (!strcmp(arg, "-xpath0")) ||
         (!strcmp(arg, "--xpath0")) ||
 #endif
+        (!strcmp(arg, "-error-ring")) ||
+        (!strcmp(arg, "--error-ring")) ||
+        (!strcmp(arg, "-error-ring-dump-file")) ||
+        (!strcmp(arg, "--error-ring-dump-file")) ||
+        (!strcmp(arg, "-error-ring-dump-cbor-file")) ||
+        (!strcmp(arg, "--error-ring-dump-cbor-file")) ||
+        (!strcmp(arg, "-error-ring-dump-bin-file")) ||
+        (!strcmp(arg, "--error-ring-dump-bin-file")) ||
+        (!strcmp(arg, "-error-xml-file")) ||
+        (!strcmp(arg, "--error-xml-file")) ||
+        (!strcmp(arg, "-error-json-file")) ||
+        (!strcmp(arg, "--error-json-file")) ||
+        (!strcmp(arg, "-error-json-warn-file")) ||
+        (!strcmp(arg, "--error-json-warn-file")) ||
+        (!strcmp(arg, "-error-redact")) ||
+        (!strcmp(arg, "--error-redact")) ||
+        (!strcmp(arg, "-error-json-limit")) ||
+        (!strcmp(arg, "--error-json-limit")) ||
+        (!strcmp(arg, "-error-json-window")) ||
+        (!strcmp(arg, "--error-json-window")) ||
+        (!strcmp(arg, "-error-dedup")) ||
+        (!strcmp(arg, "--error-dedup")) ||
         (!strcmp(arg, "-max-ampl")) ||
         (!strcmp(arg, "--max-ampl"))
     ) {
@@ -2569,6 +4156,44 @@ xmllintInit(xmllintState *lint) {
     lint->repeat = 1;
     lint->progresult = XMLLINT_RETURN_OK;
     lint->parseOptions = XML_PARSE_COMPACT | XML_PARSE_BIG_LINES;
+    lint->errorRingSize = 0;
+    lint->errorDedupLimit = 0;
+    lint->errorRingDump = 0;
+    lint->errorXml = 0;
+    lint->errorJson = 0;
+    lint->errorJsonArray = 0;
+    lint->errorJsonPretty = 0;
+    lint->errorJsonLimit = 0;
+    lint->errorJsonCount = 0;
+    lint->errorJsonArrayOpen = 0;
+    lint->errorJsonArrayCount = 0;
+    lint->errorJsonArrayFile = NULL;
+    lint->errorJsonSummary = 0;
+    lint->errorJsonWindow = 0;
+    lint->errorJsonChecksum = 0;
+    lint->errorSyslog = 0;
+    lint->errorSyslogFacility = LOG_USER;
+    lint->errorRedactFlags = 0;
+    lint->errorRingDumpFile = NULL;
+    lint->errorRingDumpCborFile = NULL;
+    lint->errorRingDumpBinFile = NULL;
+    lint->errorXmlFile = NULL;
+    lint->errorJsonFile = NULL;
+    lint->errorJsonWarnFile = NULL;
+    lint->errorRingDumpStream = NULL;
+    lint->errorRingDumpCborStream = NULL;
+    lint->errorRingDumpBinStream = NULL;
+    lint->errorXmlStream = NULL;
+    lint->errorJsonStream = NULL;
+    lint->errorJsonWarnStream = NULL;
+    lint->errorChecksum = 0;
+    lint->checksumValid = 0;
+    lint->errorCodeCounts = NULL;
+    lint->errorCodeCountsSize = 0;
+    lint->errorCodeCountsCount = 0;
+    lint->errorStageCounts = NULL;
+    lint->errorStageCountsSize = 0;
+    lint->errorStageCountsCount = 0;
 #ifdef LIBXML_HTML_ENABLED
     lint->htmlOptions = HTML_PARSE_COMPACT | HTML_PARSE_BIG_LINES;
 #endif
@@ -2752,6 +4377,187 @@ xmllintParseOptions(xmllintState *lint, int argc, const char **argv) {
 #ifdef LIBXML_HTML_ENABLED
             lint->htmlOptions |= HTML_PARSE_NOWARNING;
 #endif
+        } else if ((!strcmp(argv[i], "-error-ring")) ||
+                   (!strcmp(argv[i], "--error-ring"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-ring: missing integer value\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            if (parseInteger(&val, errStream, "error-ring", argv[i],
+                             0, INT_MAX) < 0)
+                return(XMLLINT_ERR_UNCLASS);
+            lint->errorRingSize = (int) val;
+        } else if ((!strcmp(argv[i], "-error-dedup")) ||
+                   (!strcmp(argv[i], "--error-dedup"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-dedup: missing integer value\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            if (parseInteger(&val, errStream, "error-dedup", argv[i],
+                             0, INT_MAX) < 0)
+                return(XMLLINT_ERR_UNCLASS);
+            lint->errorDedupLimit = (int) val;
+        } else if ((!strcmp(argv[i], "-error-ring-dump")) ||
+                   (!strcmp(argv[i], "--error-ring-dump"))) {
+            lint->errorRingDump = 1;
+        } else if ((!strcmp(argv[i], "-error-ring-dump-file")) ||
+                   (!strcmp(argv[i], "--error-ring-dump-file"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-ring-dump-file: missing filename\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            lint->errorRingDumpFile = argv[i];
+        } else if ((!strcmp(argv[i], "-error-ring-dump-cbor-file")) ||
+                   (!strcmp(argv[i], "--error-ring-dump-cbor-file"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-ring-dump-cbor-file: missing filename\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            lint->errorRingDumpCborFile = argv[i];
+        } else if ((!strcmp(argv[i], "-error-ring-dump-bin-file")) ||
+                   (!strcmp(argv[i], "--error-ring-dump-bin-file"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-ring-dump-bin-file: missing filename\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            lint->errorRingDumpBinFile = argv[i];
+        } else if ((!strcmp(argv[i], "-error-xml")) ||
+                   (!strcmp(argv[i], "--error-xml"))) {
+            lint->errorXml = 1;
+        } else if ((!strcmp(argv[i], "-error-xml-file")) ||
+                   (!strcmp(argv[i], "--error-xml-file"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-xml-file: missing filename\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            lint->errorXmlFile = argv[i];
+            lint->errorXml = 1;
+        } else if ((!strcmp(argv[i], "-error-json")) ||
+                   (!strcmp(argv[i], "--error-json"))) {
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-json-file")) ||
+                   (!strcmp(argv[i], "--error-json-file"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-json-file: missing filename\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            lint->errorJsonFile = argv[i];
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-json-warn-file")) ||
+                   (!strcmp(argv[i], "--error-json-warn-file"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-json-warn-file: missing filename\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            lint->errorJsonWarnFile = argv[i];
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-json-array")) ||
+                   (!strcmp(argv[i], "--error-json-array"))) {
+            lint->errorJsonArray = 1;
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-json-pretty")) ||
+                   (!strcmp(argv[i], "--error-json-pretty"))) {
+            lint->errorJsonPretty = 1;
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-json-summary")) ||
+                   (!strcmp(argv[i], "--error-json-summary"))) {
+            lint->errorJsonSummary = 1;
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-json-window")) ||
+                   (!strcmp(argv[i], "--error-json-window"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-json-window: missing integer value\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            if (parseInteger(&val, errStream, "error-json-window", argv[i],
+                             0, INT_MAX) < 0)
+                return(XMLLINT_ERR_UNCLASS);
+            lint->errorJsonWindow = (int) val;
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-redact")) ||
+                   (!strcmp(argv[i], "--error-redact"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-redact: missing value\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            if (xmllintParseRedact(lint, errStream, argv[i]) < 0)
+                return(XMLLINT_ERR_UNCLASS);
+        } else if ((!strcmp(argv[i], "-error-json-checksum")) ||
+                   (!strcmp(argv[i], "--error-json-checksum"))) {
+            lint->errorJsonChecksum = 1;
+            lint->errorJson = 1;
+        } else if ((!strcmp(argv[i], "-error-syslog")) ||
+                   (!strcmp(argv[i], "--error-syslog"))) {
+#ifndef _WIN32
+            lint->errorSyslog = 1;
+            lint->errorJson = 1;
+#else
+            fprintf(errStream, "Warning: --error-syslog unsupported on Windows\n");
+#endif
+        } else if ((!strcmp(argv[i], "-error-syslog-facility")) ||
+                   (!strcmp(argv[i], "--error-syslog-facility"))) {
+#ifndef _WIN32
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-syslog-facility: missing value\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            lint->errorSyslog = 1;
+            lint->errorJson = 1;
+            if (!strcmp(argv[i], "auth"))
+                lint->errorSyslogFacility = LOG_AUTH;
+            else if (!strcmp(argv[i], "authpriv"))
+                lint->errorSyslogFacility = LOG_AUTHPRIV;
+            else if (!strcmp(argv[i], "daemon"))
+                lint->errorSyslogFacility = LOG_DAEMON;
+            else if (!strcmp(argv[i], "user"))
+                lint->errorSyslogFacility = LOG_USER;
+            else if (!strcmp(argv[i], "local0"))
+                lint->errorSyslogFacility = LOG_LOCAL0;
+            else if (!strcmp(argv[i], "local1"))
+                lint->errorSyslogFacility = LOG_LOCAL1;
+            else if (!strcmp(argv[i], "local2"))
+                lint->errorSyslogFacility = LOG_LOCAL2;
+            else if (!strcmp(argv[i], "local3"))
+                lint->errorSyslogFacility = LOG_LOCAL3;
+            else if (!strcmp(argv[i], "local4"))
+                lint->errorSyslogFacility = LOG_LOCAL4;
+            else if (!strcmp(argv[i], "local5"))
+                lint->errorSyslogFacility = LOG_LOCAL5;
+            else if (!strcmp(argv[i], "local6"))
+                lint->errorSyslogFacility = LOG_LOCAL6;
+            else if (!strcmp(argv[i], "local7"))
+                lint->errorSyslogFacility = LOG_LOCAL7;
+            else {
+                fprintf(errStream, "error-syslog-facility: invalid value %s\n",
+                        argv[i]);
+                return(XMLLINT_ERR_UNCLASS);
+            }
+#else
+            fprintf(errStream, "Warning: --error-syslog-facility unsupported on Windows\n");
+#endif
+        } else if ((!strcmp(argv[i], "-error-json-limit")) ||
+                   (!strcmp(argv[i], "--error-json-limit"))) {
+            i++;
+            if (i >= argc) {
+                fprintf(errStream, "error-json-limit: missing integer value\n");
+                return(XMLLINT_ERR_UNCLASS);
+            }
+            if (parseInteger(&val, errStream, "error-json-limit", argv[i],
+                             0, INT_MAX) < 0)
+                return(XMLLINT_ERR_UNCLASS);
+            lint->errorJsonLimit = (int) val;
+            lint->errorJson = 1;
         } else if ((!strcmp(argv[i], "-pedantic")) ||
                    (!strcmp(argv[i], "--pedantic"))) {
             lint->parseOptions |= XML_PARSE_PEDANTIC;
@@ -2917,6 +4723,120 @@ xmllintParseOptions(xmllintState *lint, int argc, const char **argv) {
     if (lint->appOptions & XML_LINT_NAVIGATING_SHELL)
         lint->repeat = 1;
 
+    if ((lint->errorRingDump || (lint->errorRingDumpFile != NULL) ||
+         (lint->errorRingDumpCborFile != NULL) ||
+         (lint->errorRingDumpBinFile != NULL)) &&
+        (lint->errorRingSize == 0)) {
+        fprintf(errStream,
+                "Warning: --error-ring-dump requires --error-ring; "
+                "defaulting to 32\n");
+        lint->errorRingSize = 32;
+    }
+
+    if (lint->errorJsonArray && !lint->errorJson) {
+        lint->errorJson = 1;
+    }
+
+    if (lint->errorJsonFile != NULL) {
+        lint->errorJsonStream = fopen(lint->errorJsonFile, "a");
+        if (lint->errorJsonStream == NULL) {
+            fprintf(errStream, "error-json-file: failed to open %s\n",
+                    lint->errorJsonFile);
+            return(XMLLINT_ERR_UNCLASS);
+        }
+    }
+
+    if (lint->errorJsonWarnFile != NULL) {
+        lint->errorJsonWarnStream = fopen(lint->errorJsonWarnFile, "a");
+        if (lint->errorJsonWarnStream == NULL) {
+            fprintf(errStream, "error-json-warn-file: failed to open %s\n",
+                    lint->errorJsonWarnFile);
+            if (lint->errorJsonStream != NULL)
+                fclose(lint->errorJsonStream);
+            return(XMLLINT_ERR_UNCLASS);
+        }
+    }
+
+    if (lint->errorRingDumpFile != NULL) {
+        lint->errorRingDumpStream = fopen(lint->errorRingDumpFile, "a");
+        if (lint->errorRingDumpStream == NULL) {
+            fprintf(errStream, "error-ring-dump-file: failed to open %s\n",
+                    lint->errorRingDumpFile);
+            if (lint->errorJsonStream != NULL)
+                fclose(lint->errorJsonStream);
+            if (lint->errorJsonWarnStream != NULL)
+                fclose(lint->errorJsonWarnStream);
+            return(XMLLINT_ERR_UNCLASS);
+        }
+        lint->errorRingDump = 1;
+    }
+
+    if (lint->errorRingDumpCborFile != NULL) {
+        lint->errorRingDumpCborStream = fopen(lint->errorRingDumpCborFile, "ab");
+        if (lint->errorRingDumpCborStream == NULL) {
+            fprintf(errStream, "error-ring-dump-cbor-file: failed to open %s\n",
+                    lint->errorRingDumpCborFile);
+            if (lint->errorJsonStream != NULL)
+                fclose(lint->errorJsonStream);
+            if (lint->errorJsonWarnStream != NULL)
+                fclose(lint->errorJsonWarnStream);
+            if (lint->errorRingDumpStream != NULL)
+                fclose(lint->errorRingDumpStream);
+            return(XMLLINT_ERR_UNCLASS);
+        }
+        lint->errorRingDump = 1;
+    }
+
+    if (lint->errorRingDumpBinFile != NULL) {
+        long pos;
+
+        lint->errorRingDumpBinStream = fopen(lint->errorRingDumpBinFile, "ab");
+        if (lint->errorRingDumpBinStream == NULL) {
+            fprintf(errStream, "error-ring-dump-bin-file: failed to open %s\n",
+                    lint->errorRingDumpBinFile);
+            if (lint->errorJsonStream != NULL)
+                fclose(lint->errorJsonStream);
+            if (lint->errorJsonWarnStream != NULL)
+                fclose(lint->errorJsonWarnStream);
+            if (lint->errorRingDumpStream != NULL)
+                fclose(lint->errorRingDumpStream);
+            if (lint->errorRingDumpCborStream != NULL)
+                fclose(lint->errorRingDumpCborStream);
+            return(XMLLINT_ERR_UNCLASS);
+        }
+        if (fseek(lint->errorRingDumpBinStream, 0, SEEK_END) == 0) {
+            pos = ftell(lint->errorRingDumpBinStream);
+            if (pos == 0)
+                xmllintWriteBinHeader(lint->errorRingDumpBinStream);
+        }
+    }
+
+    if (lint->errorXmlFile != NULL) {
+        lint->errorXmlStream = fopen(lint->errorXmlFile, "a");
+        if (lint->errorXmlStream == NULL) {
+            fprintf(errStream, "error-xml-file: failed to open %s\n",
+                    lint->errorXmlFile);
+            if (lint->errorJsonStream != NULL)
+                fclose(lint->errorJsonStream);
+            if (lint->errorJsonWarnStream != NULL)
+                fclose(lint->errorJsonWarnStream);
+            if (lint->errorRingDumpStream != NULL)
+                fclose(lint->errorRingDumpStream);
+            if (lint->errorRingDumpCborStream != NULL)
+                fclose(lint->errorRingDumpCborStream);
+            if (lint->errorRingDumpBinStream != NULL)
+                fclose(lint->errorRingDumpBinStream);
+            return(XMLLINT_ERR_UNCLASS);
+        }
+        lint->errorXml = 1;
+    }
+
+#ifndef _WIN32
+    if (lint->errorSyslog) {
+        openlog("xmllint", LOG_PID, lint->errorSyslogFacility);
+    }
+#endif
+
 #ifdef LIBXML_READER_ENABLED
     if (lint->appOptions & XML_LINT_USE_STREAMING) {
         specialMode = "--stream";
@@ -3075,6 +4995,10 @@ xmllintMain(int argc, const char **argv, FILE *errStream,
     res = xmllintParseOptions(lint, argc, argv);
     if (res != XMLLINT_RETURN_OK) {
         return(res);
+    }
+
+    if (lint->errorJson || lint->errorXml) {
+        xmlSetStructuredErrorFunc(lint, xmllintStructuredError);
     }
 
     /*
@@ -3309,6 +5233,13 @@ xmllintMain(int argc, const char **argv, FILE *errStream,
                 goto error;
             }
 
+            if (lint->errorJson || lint->errorXml)
+                xmlCtxtSetErrorHandler(ctxt, xmllintStructuredError, lint);
+            if (lint->errorRingSize > 0)
+                xmlCtxtSetErrorRingSize(ctxt, lint->errorRingSize);
+            if (lint->errorDedupLimit > 0)
+                xmlCtxtSetErrorDedup(ctxt, lint->errorDedupLimit);
+
             if (lint->appOptions & XML_LINT_SAX_ENABLED) {
                 const xmlSAXHandler *handler;
 
@@ -3342,6 +5273,26 @@ xmllintMain(int argc, const char **argv, FILE *errStream,
                     {
                         xmlCtxtReset(ctxt);
                     }
+                    if (lint->errorRingSize > 0)
+                        xmlCtxtResetErrorRing(ctxt);
+                    if (lint->errorDedupLimit > 0)
+                        xmlCtxtResetErrorDedup(ctxt);
+                }
+
+                lint->errorJsonArrayOpen = 0;
+                lint->errorJsonArrayCount = 0;
+                lint->errorJsonArrayFile = filename;
+                lint->errorJsonCount = 0;
+                xmllintErrorStatsReset(lint);
+                if (lint->errorJsonChecksum) {
+                    lint->errorChecksum = xmllintChecksumFile(filename,
+                                                              &lint->checksumValid);
+                } else {
+                    lint->errorChecksum = 0;
+                    lint->checksumValid = 0;
+                }
+                if (lint->errorJsonArray) {
+                    xmllintStartErrorArray(lint, filename);
                 }
 
                 if (lint->appOptions & XML_LINT_SAX_ENABLED) {
@@ -3351,6 +5302,18 @@ xmllintMain(int argc, const char **argv, FILE *errStream,
                 }
             }
 
+            if (lint->errorJsonArray && lint->errorJsonArrayOpen) {
+                xmllintFinishErrorArray(lint);
+            } else if (lint->errorJsonSummary && lint->errorJson) {
+                xmllintWriteSummaryLine(lint, filename);
+            }
+
+            if (lint->errorRingDump)
+                xmllintDumpErrorRing(lint, ctxt, filename);
+            if (lint->errorRingDumpCborStream != NULL)
+                xmllintDumpErrorRingCbor(lint, ctxt, filename);
+            if (lint->errorRingDumpBinStream != NULL)
+                xmllintDumpErrorRingBinary(lint, ctxt, filename);
             xmlFreeParserCtxt(ctxt);
         }
 
@@ -3402,6 +5365,38 @@ error:
                 xmllintMaxmem);
     } else if (lint->progresult == XMLLINT_ERR_MEM) {
         fprintf(errStream, "Out-of-memory error reported\n");
+    }
+
+    if (lint->errorJsonArray && lint->errorJsonArrayOpen) {
+        xmllintFinishErrorArray(lint);
+    }
+
+    if (lint->errorJsonStream != NULL)
+        fclose(lint->errorJsonStream);
+    if (lint->errorJsonWarnStream != NULL)
+        fclose(lint->errorJsonWarnStream);
+    if (lint->errorRingDumpStream != NULL)
+        fclose(lint->errorRingDumpStream);
+    if (lint->errorRingDumpCborStream != NULL)
+        fclose(lint->errorRingDumpCborStream);
+    if (lint->errorRingDumpBinStream != NULL)
+        fclose(lint->errorRingDumpBinStream);
+    if (lint->errorXmlStream != NULL)
+        fclose(lint->errorXmlStream);
+#ifndef _WIN32
+    if (lint->errorSyslog)
+        closelog();
+#endif
+    if (lint->errorCodeCounts != NULL)
+        xmlFree(lint->errorCodeCounts);
+    if (lint->errorStageCounts != NULL) {
+        int stageIndex;
+        for (stageIndex = 0; stageIndex < lint->errorStageCountsCount;
+             stageIndex++) {
+            xmlFree(lint->errorStageCounts[stageIndex].name);
+            lint->errorStageCounts[stageIndex].name = NULL;
+        }
+        xmlFree(lint->errorStageCounts);
     }
 
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION

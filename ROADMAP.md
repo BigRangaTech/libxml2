@@ -1,3 +1,5 @@
+SPDX-License-Identifier: GPL-2.0-or-later
+
 # libxml2 E-Reader Roadmap (Draft v0)
 
 Goal: prioritize security, then performance, then features, then API/switches, then build size, then compatibility for the e-reader stack (Linux + Android) where libxml2 is used via libmobi.
@@ -8,6 +10,8 @@ Constraints:
 - Monocypher stays app-side (no new libxml2 dependency).
 - libxml2 is a dependency of libmobi and the app; prefer additive changes.
 - Keep all modules fully supported; focus on stability and security, not feature trimming.
+- Fork is maintained as standalone; upstream merges are optional.
+- Distribution license: GPL-2.0-or-later (upstream MIT notices retained).
 
 Current State (2026-02-03):
 - Fork matches upstream master at commit `2cc58340`.
@@ -17,6 +21,29 @@ Current State (2026-02-03):
 - libmobi parse entry point: `src/parse_rawml.c` uses `htmlReadMemory(... HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING | HTML_PARSE_NONET)`.
 - libmobi parse entry point: `src/parse_rawml.c` uses `xmlReadMemory(... XML_PARSE_RECOVER | XML_PARSE_NOERROR | XML_PARSE_NOWARNING | XML_PARSE_NONET)` for NCX.
 - libmobi output use: `src/opf.c` uses `xmlTextWriter*` APIs (writer only).
+
+## Progress (2026-02-05)
+Completed (Documentation reflects implemented work in this fork):
+- Added `xmllint --no-xxe`.
+- Added secure-defaults build flag (opt-in safe defaults for legacy APIs).
+- Added resource loader/policy enforcement and richer error context.
+- Added per-context error ring buffers and error deduplication.
+- Added structured JSON and XML error output helpers.
+- Added xmllint structured error output switches, redaction, and ring dumps
+  (JSON, XML, CBOR, binary frames).
+- Added global defaults for max amplification and dictionary limits.
+- Added `ereader_integration.md` for app-side guidance.
+
+Documentation Status:
+- `README.md` covers secure-defaults build options and testing commands.
+- `ereader_integration.md` covers recommended parser flags and limits.
+- `doc/xmllint.xml` documents structured error output switches.
+- `error_output_formats.md` documents JSON, XML, CBOR, and binary ring formats.
+- `security_defaults.md` documents recommended secure defaults and tuning.
+- `security_audit_checklist.md` defines periodic review steps.
+- `release_process.md` defines release steps for this fork.
+- `diagnostics_quickstart.md` provides structured error usage examples.
+- `troubleshooting.md` documents common parse failures and fixes.
 
 ## Phase 0: Baseline & Inventory
 - Confirm libmobi usage paths (which libxml2 APIs, options, and parsing modes it uses).
@@ -38,6 +65,18 @@ Current State (2026-02-03):
   message and includes parse stage info where available.
 - Library-side: add a per-context error ring buffer and JSON formatter
   helper for app telemetry.
+- Library-side: add error fingerprinting, schema versioning, and per-file
+  error summaries for stable telemetry and triage.
+- Library-side: add error deduplication after N repeats to reduce noise.
+- App-side: define a severity mapping table from libxml2 error levels to
+  user-facing severity.
+- Library-side: add optional structured XML error output (for systems that
+  can't consume JSON).
+- Library-side: add per-stage timing and error counts in summaries for
+  lightweight profiling.
+- Library-side: add optional binary export (protobuf/flatbuffer) for error
+  ring dumps when JSON/CBOR is too large.
+- App-side: add configurable error redaction rules for PII (paths/URIs).
 - Add a build-time switch to hard-enforce safe defaults in libxml2 for legacy APIs (opt-in; does not change default behavior unless enabled).
 - Set a strict amplification factor via `xmlCtxtSetMaxAmplification` for untrusted input.
 - Add/enable limits for dictionary size and node sizes when reading untrusted documents.
@@ -64,6 +103,14 @@ Current State (2026-02-03):
 - Expose a CLI or build‑time switch for `--no-xxe` in xmllint (already added in this fork).
 - Add a libxml2 config toggle to enable safe defaults globally when built for e-reader firmware.
 - Add a switch to set max amplification from environment or config.
+- Add xmllint switches for richer error output and routing:
+  `--error-json-array`, `--error-json-pretty`, `--error-json-limit`,
+  `--error-json-summary`, `--error-json-window`, `--error-json-checksum`,
+  `--error-json-warn-file`, `--error-ring`, `--error-ring-dump`,
+  `--error-ring-dump-file`, `--error-ring-dump-cbor-file`,
+  `--error-syslog`, `--error-syslog-facility`,
+  `--error-xml`, `--error-xml-file`, `--error-redact`,
+  `--error-ring-dump-bin-file`, `--error-dedup`.
 
 ## Phase 5: Build Size & Compatibility
 - Keep all modules enabled; do not trim features for this fork.

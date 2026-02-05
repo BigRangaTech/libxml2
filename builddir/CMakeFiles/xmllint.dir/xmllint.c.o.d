@@ -83,7 +83,11 @@ CMakeFiles/xmllint.dir/xmllint.c.o: \
  /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h \
  /usr/include/x86_64-linux-gnu/bits/stat.h \
  /usr/include/x86_64-linux-gnu/bits/struct_stat.h \
- /usr/include/x86_64-linux-gnu/bits/fcntl2.h \
+ /usr/include/x86_64-linux-gnu/bits/fcntl2.h /usr/include/syslog.h \
+ /usr/include/x86_64-linux-gnu/sys/syslog.h \
+ /usr/include/x86_64-linux-gnu/bits/syslog-path.h \
+ /usr/include/x86_64-linux-gnu/bits/syslog.h \
+ /usr/include/x86_64-linux-gnu/bits/syslog-decl.h \
  /usr/include/x86_64-linux-gnu/sys/time.h /usr/include/unistd.h \
  /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
  /usr/include/x86_64-linux-gnu/bits/environments.h \

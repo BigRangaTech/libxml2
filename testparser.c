@@ -214,7 +214,9 @@ testErrorRing(void) {
     xmlDocPtr doc;
     xmlError errors[2];
     xmlChar *json = NULL;
+    xmlChar *xml = NULL;
     int len = 0;
+    int xmlLen = 0;
     int count;
     int i;
     int err = 0;
@@ -232,6 +234,7 @@ testErrorRing(void) {
     if (doc != NULL)
         xmlFreeDoc(doc);
 
+    memset(errors, 0, sizeof(errors));
     count = xmlCtxtGetErrorRing(ctxt, errors, 2);
     if (count <= 0) {
         fprintf(stderr, "error ring is empty\n");
@@ -242,9 +245,15 @@ testErrorRing(void) {
             fprintf(stderr, "xmlErrorToJson failed\n");
             err = 1;
         }
+        if (xmlErrorToXml(&errors[0], &xml, &xmlLen) != 0 ||
+            (xml == NULL) || (xmlLen <= 0)) {
+            fprintf(stderr, "xmlErrorToXml failed\n");
+            err = 1;
+        }
     }
 
     xmlFree(json);
+    xmlFree(xml);
 
     for (i = 0; i < count; i++)
         xmlResetError(&errors[i]);
@@ -255,6 +264,52 @@ testErrorRing(void) {
         err = 1;
     }
 
+    xmlFreeParserCtxt(ctxt);
+
+    return err;
+}
+
+static int
+testErrorDedup(void) {
+    xmlParserCtxtPtr ctxt;
+    xmlDocPtr doc;
+    xmlError errors[8];
+    int count;
+    int i;
+    int err = 0;
+
+    ctxt = xmlNewParserCtxt();
+    if (ctxt == NULL) {
+        fprintf(stderr, "xmlNewParserCtxt failed\n");
+        return 1;
+    }
+
+    xmlCtxtSetErrorHandler(ctxt, ignoreStructuredError, NULL);
+    if (xmlCtxtSetErrorDedup(ctxt, 1) != 0) {
+        fprintf(stderr, "xmlCtxtSetErrorDedup failed\n");
+        err = 1;
+    } else if (xmlCtxtGetErrorDedup(ctxt) != 1) {
+        fprintf(stderr, "xmlCtxtGetErrorDedup failed\n");
+        err = 1;
+    }
+    xmlCtxtSetErrorRingSize(ctxt, 8);
+
+    doc = xmlCtxtReadDoc(ctxt, BAD_CAST "<doc>&undef;&undef;</doc>",
+                         NULL, NULL, 0);
+    if (doc != NULL)
+        xmlFreeDoc(doc);
+
+    memset(errors, 0, sizeof(errors));
+    count = xmlCtxtGetErrorRing(ctxt, errors, 8);
+    if (count != 1) {
+        fprintf(stderr, "error dedup failed (count=%d)\n", count);
+        err = 1;
+    }
+
+    for (i = 0; i < count; i++)
+        xmlResetError(&errors[i]);
+
+    xmlCtxtResetErrorRing(ctxt);
     xmlFreeParserCtxt(ctxt);
 
     return err;
@@ -1668,6 +1723,7 @@ main(void) {
     err |= testUndeclEntInContent();
     err |= testInvalidCharRecovery();
     err |= testErrorRing();
+    err |= testErrorDedup();
     err |= testRequireResourceLoader();
     err |= testResourcePolicy();
     err |= testCtxtInputGetters();

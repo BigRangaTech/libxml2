@@ -746,6 +746,63 @@ xmlVRaiseError(xmlStructuredErrorFunc schannel,
 }
 
 /**
+ * Update the appropriate global or contextual error structure
+ * without invoking any error callbacks.
+ *
+ * @param ctx  the parser context or NULL
+ * @param node  the current node or NULL
+ * @param domain  the domain for the error
+ * @param code  the code for the error
+ * @param level  the xmlErrorLevel for the error
+ * @param file  the file source of the error (or NULL)
+ * @param line  the line of the error or 0 if N/A
+ * @param str1  extra string info
+ * @param str2  extra string info
+ * @param str3  extra string info
+ * @param int1  extra int info
+ * @param col  column number of the error or 0 if N/A
+ * @param msg  the message to display/transmit
+ * @param ap  extra parameters for the message display
+ * @returns 0 on success, -1 if a memory allocation failed.
+ */
+int
+xmlVUpdateErrorNoCallback(void *ctx, xmlNode *node,
+                          int domain, int code, xmlErrorLevel level,
+                          const char *file, int line, const char *str1,
+                          const char *str2, const char *str3, int int1,
+                          int col, const char *msg, va_list ap)
+{
+    xmlParserCtxtPtr ctxt = NULL;
+    xmlErrorPtr lastError = xmlGetLastErrorInternal();
+    xmlErrorPtr to = lastError;
+
+    if (code == XML_ERR_OK)
+        return(0);
+    if ((xmlGetWarningsDefaultValue == 0) && (level == XML_ERR_WARNING))
+        return(0);
+
+    if ((domain == XML_FROM_PARSER) || (domain == XML_FROM_HTML) ||
+        (domain == XML_FROM_DTD) || (domain == XML_FROM_NAMESPACE) ||
+        (domain == XML_FROM_IO) || (domain == XML_FROM_VALID)) {
+        ctxt = (xmlParserCtxtPtr) ctx;
+
+        if (ctxt != NULL)
+            to = &ctxt->lastError;
+    }
+
+    if (xmlVUpdateError(to, ctxt, node, domain, code, level, file, line,
+                        str1, str2, str3, int1, col, msg, ap))
+        return(-1);
+
+    if (to != lastError) {
+        if (xmlCopyError(to, lastError) < 0)
+            return(-1);
+    }
+
+    return(0);
+}
+
+/**
  * Update the appropriate global or contextual error structure,
  * then forward the error message down the parser or generic
  * error callback handler
@@ -1073,6 +1130,89 @@ xmlJsonAddInt(xmlBufferPtr buf, int value) {
     return(xmlBufferAdd(buf, BAD_CAST tmp, len));
 }
 
+static int
+xmlXmlEscape(xmlBufferPtr buf, const char *str) {
+    const unsigned char *cur;
+
+    if (str == NULL)
+        return(0);
+
+    for (cur = (const unsigned char *) str; *cur != '\0'; cur++) {
+        switch (*cur) {
+            case '&':
+                if (xmlBufferAdd(buf, BAD_CAST "&amp;", 5) != 0)
+                    return(-1);
+                break;
+            case '<':
+                if (xmlBufferAdd(buf, BAD_CAST "&lt;", 4) != 0)
+                    return(-1);
+                break;
+            case '>':
+                if (xmlBufferAdd(buf, BAD_CAST "&gt;", 4) != 0)
+                    return(-1);
+                break;
+            case '"':
+                if (xmlBufferAdd(buf, BAD_CAST "&quot;", 6) != 0)
+                    return(-1);
+                break;
+            case '\'':
+                if (xmlBufferAdd(buf, BAD_CAST "&apos;", 6) != 0)
+                    return(-1);
+                break;
+            default:
+                if (xmlBufferAdd(buf, BAD_CAST cur, 1) != 0)
+                    return(-1);
+        }
+    }
+
+    return(0);
+}
+
+static int
+xmlXmlAddIntAttr(xmlBufferPtr buf, const char *name, int value) {
+    char tmp[64];
+    int len;
+
+    len = snprintf(tmp, sizeof(tmp), " %s=\"%d\"", name, value);
+    if (len <= 0)
+        return(-1);
+
+    return(xmlBufferAdd(buf, BAD_CAST tmp, len));
+}
+
+static int
+xmlXmlAddStrAttr(xmlBufferPtr buf, const char *name, const char *value) {
+    if (xmlBufferAdd(buf, BAD_CAST " ", 1) != 0)
+        return(-1);
+    if (xmlBufferAdd(buf, BAD_CAST name, (int) strlen(name)) != 0)
+        return(-1);
+    if (xmlBufferAdd(buf, BAD_CAST "=\"", 2) != 0)
+        return(-1);
+    if (xmlXmlEscape(buf, value) != 0)
+        return(-1);
+    return(xmlBufferAdd(buf, BAD_CAST "\"", 1));
+}
+
+static int
+xmlXmlAddElement(xmlBufferPtr buf, const char *name, const char *value) {
+    if (xmlBufferAdd(buf, BAD_CAST "<", 1) != 0)
+        return(-1);
+    if (xmlBufferAdd(buf, BAD_CAST name, (int) strlen(name)) != 0)
+        return(-1);
+    if (value == NULL) {
+        return(xmlBufferAdd(buf, BAD_CAST "/>", 2));
+    }
+    if (xmlBufferAdd(buf, BAD_CAST ">", 1) != 0)
+        return(-1);
+    if (xmlXmlEscape(buf, value) != 0)
+        return(-1);
+    if (xmlBufferAdd(buf, BAD_CAST "</", 2) != 0)
+        return(-1);
+    if (xmlBufferAdd(buf, BAD_CAST name, (int) strlen(name)) != 0)
+        return(-1);
+    return(xmlBufferAdd(buf, BAD_CAST ">", 1));
+}
+
 /**
  * Convert an xmlError to a JSON string.
  *
@@ -1140,6 +1280,73 @@ xmlErrorToJson(const xmlError *err, xmlChar **out, int *len) {
     if (xmlJsonEscape(buf, err->str3) != 0)
         goto cleanup;
     if (xmlBufferAdd(buf, BAD_CAST "}", 1) != 0)
+        goto cleanup;
+
+    result = xmlStrdup(xmlBufferContent(buf));
+    if (result == NULL)
+        goto cleanup;
+
+    *out = result;
+    if (len != NULL)
+        *len = xmlBufferLength(buf);
+    ret = 0;
+
+cleanup:
+    xmlBufferFree(buf);
+    return(ret);
+}
+
+/**
+ * Convert an xmlError to an XML string.
+ *
+ * The returned string must be freed with xmlFree.
+ *
+ * @since 2.16.0
+ * @param err  error to convert
+ * @param out  output pointer for XML string
+ * @param len  output length in bytes (optional)
+ * @returns 0 on success, -1 on error.
+ */
+int
+xmlErrorToXml(const xmlError *err, xmlChar **out, int *len) {
+    xmlBufferPtr buf;
+    xmlChar *result;
+    int ret = -1;
+
+    if ((err == NULL) || (out == NULL))
+        return(-1);
+
+    buf = xmlBufferCreate();
+    if (buf == NULL)
+        return(-1);
+
+    if (xmlBufferAdd(buf, BAD_CAST "<error", 6) != 0)
+        goto cleanup;
+    if (xmlXmlAddIntAttr(buf, "domain", err->domain) != 0)
+        goto cleanup;
+    if (xmlXmlAddIntAttr(buf, "code", err->code) != 0)
+        goto cleanup;
+    if (xmlXmlAddIntAttr(buf, "level", err->level) != 0)
+        goto cleanup;
+    if (xmlXmlAddStrAttr(buf, "file", err->file) != 0)
+        goto cleanup;
+    if (xmlXmlAddIntAttr(buf, "line", err->line) != 0)
+        goto cleanup;
+    if (xmlXmlAddIntAttr(buf, "column", err->int2) != 0)
+        goto cleanup;
+    if (xmlXmlAddIntAttr(buf, "int1", err->int1) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST ">", 1) != 0)
+        goto cleanup;
+    if (xmlXmlAddElement(buf, "message", err->message) != 0)
+        goto cleanup;
+    if (xmlXmlAddElement(buf, "str1", err->str1) != 0)
+        goto cleanup;
+    if (xmlXmlAddElement(buf, "str2", err->str2) != 0)
+        goto cleanup;
+    if (xmlXmlAddElement(buf, "str3", err->str3) != 0)
+        goto cleanup;
+    if (xmlBufferAdd(buf, BAD_CAST "</error>", 8) != 0)
         goto cleanup;
 
     result = xmlStrdup(xmlBufferContent(buf));
