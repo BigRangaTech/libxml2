@@ -1,6 +1,8 @@
 SPDX-License-Identifier: GPL-2.0-or-later
 
-# libxml2 E-Reader Roadmap (Draft v0)
+# libxml2 + libmobi Integration Roadmap (Draft v0.2)
+
+Updated: 2026-02-06
 
 Goal: prioritize security, then performance, then features, then API/switches, then build size, then compatibility for the e-reader stack (Linux + Android) where libxml2 is used via libmobi.
 
@@ -13,13 +15,13 @@ Constraints:
 - Fork is maintained as standalone; upstream merges are optional.
 - Distribution license: GPL-2.0-or-later (upstream MIT notices retained).
 
-Current State (2026-02-03):
+Current State (2026-02-06):
 - Fork matches upstream master at commit `2cc58340`.
 - Added `/dev/urandom` fallback for RNG seeding on older POSIX systems in `dict.c`.
 - Added xmllint `--no-xxe` switch and documentation in `xmllint.c` and `doc/xmllint.xml`.
-- libmobi integration notes are maintained externally (libmobi fork is not vendored here).
+- libmobi integration notes are maintained in the libmobi fork (`AGENTS.md`, `WHATS_NEW.md`).
 
-## Progress (2026-02-05)
+## Progress (2026-02-06)
 Completed (Documentation reflects implemented work in this fork):
 - Added `xmllint --no-xxe`.
 - Added secure-defaults build flag (opt-in safe defaults for legacy APIs).
@@ -30,8 +32,12 @@ Completed (Documentation reflects implemented work in this fork):
   (JSON, XML, CBOR, binary frames).
 - Added global defaults for max amplification and dictionary limits.
 - Added `ereader_integration.md` for app-side guidance.
-- Libmobi integration: added `XML_PARSE_NO_XXE | XML_PARSE_COMPACT` for NCX parsing
-  and `HTML_PARSE_COMPACT` for HTML parsing (libmobi fork).
+- Libmobi integration:
+  - Build: `./configure --with-libxml2=libxml2` uses bundled fork and `make`
+    builds `libxml2/` first; CMake `add_subdirectory(libxml2)` when present.
+  - Parsing flags in libmobi: HTML uses `HTML_PARSE_NONET | HTML_PARSE_COMPACT`;
+    NCX uses `XML_PARSE_NO_XXE | XML_PARSE_COMPACT`.
+- Test signal (libmobi): `make test` PASS 11, XFAIL 1 (sample-invalid-indx.fail).
 
 Documentation Status:
 - `README.md` covers secure-defaults build options and testing commands.
@@ -44,13 +50,21 @@ Documentation Status:
 - `diagnostics_quickstart.md` provides structured error usage examples.
 - `troubleshooting.md` documents common parse failures and fixes.
 
-Libmobi Integration Status (2026-02-05):
-- Build: libmobi can use this fork via `./configure --with-libxml2=libxml2` or
-  CMake `add_subdirectory(libxml2)` when present.
-- Parsing flags in libmobi:
-  - HTML: `HTML_PARSE_NONET` + `HTML_PARSE_COMPACT`.
-  - XML (NCX): `XML_PARSE_NO_XXE | XML_PARSE_COMPACT`.
-- Test signal (libmobi): `make test` PASS 11, XFAIL 1 (sample-invalid-indx.fail).
+## Libmobi Integration Contract
+- Build discovery: libmobi prefers bundled `libxml2/` when present; external
+  libxml2 can be used with `--with-libxml2=/path`.
+- Parser flags: `HTML_PARSE_NONET | HTML_PARSE_COMPACT` for HTML, and
+  `XML_PARSE_NO_XXE | XML_PARSE_COMPACT` for NCX.
+- Size guards: libmobi must check `size_t` to `int` casts before calling
+  `htmlReadMemory`/`xmlReadMemory`; skip/scan fallback for oversized inputs.
+- No DTD expansion for untrusted input (avoid `XML_PARSE_NOENT`).
+- Error handling: prefer structured error capture (ring buffer) where available;
+  map to libmobi JSON diagnostics when exposed.
+
+## Integration Tasks (libmobi)
+- Wire libxml2 structured error output into libmobi diagnostics (JSON path).
+- Ensure secure-defaults build flag is documented in libmobi build guide.
+- Add CI job that builds libmobi with bundled libxml2 and runs the test corpus.
 
 ## Phase 0: Baseline & Inventory
 - Confirm libmobi usage paths (which libxml2 APIs, options, and parsing modes it uses).
